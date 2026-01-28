@@ -1,4 +1,10 @@
 <?php
+
+$lines = file(__DIR__ . '/.env');
+foreach ($lines as $line) {
+    putenv(trim($line));
+}
+
 /**
  * BitChat Unified Configuration
  * 
@@ -6,10 +12,11 @@
  */
 
 // Database credentials - unified approach
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'chatbot');  // Using the correct database name
-define('DB_USER', 'root');
-define('DB_PASS', '');  // Set your password here if needed
+define('DB_HOST', getenv('DB_HOST'));
+define('DB_NAME', getenv('DB_NAME'));
+define('DB_USER', getenv('DB_USER'));
+define('DB_PASS', getenv('DB_PASS'));
+
 
 // Session configuration
 if (session_status() == PHP_SESSION_NONE) {
