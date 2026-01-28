@@ -45,7 +45,7 @@
                 <p class="text-sm text-gray-400">Uptime</p>
             </div>
             <div>
-                <p class="text-3xl font-bold">5x</p>
+                <p class="text-3xl font-bold">10x</p>
                 <p class="text-sm text-gray-400">Lead Conversion</p>
             </div>
             <div>
