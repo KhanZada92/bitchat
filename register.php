@@ -18,25 +18,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Validation
     if (empty($username)) {
-        $errors[] = "Username required hai";
+        $errors[] = "Username is required";
     } elseif (strlen($username) < 3) {
-        $errors[] = "Username kam az kam 3 characters ka hona chahiye";
+        $errors[] = "Username must be at least 3 characters long";
     }
     
     if (empty($email)) {
-        $errors[] = "Email required hai";
+        $errors[] = "Email is required";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = "Valid email address enter karein";
+        $errors[] = "Please enter a valid email address";
     }
     
     if (empty($password)) {
-        $errors[] = "Password required hai";
+        $errors[] = "Password is required";
     } elseif (strlen($password) < 6) {
-        $errors[] = "Password kam az kam 6 characters ka hona chahiye";
+        $errors[] = "Password must be at least 6 characters long";
     }
     
     if ($password !== $confirm_password) {
-        $errors[] = "Passwords match nahi kar rahe";
+        $errors[] = "Passwords do not match";
     }
     
     // Check if username or email already exists
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = $stmt->get_result();
         
         if ($result->num_rows > 0) {
-            $errors[] = "Username ya email pehle se mojood hai";
+            $errors[] = "Username or email already exists";
         }
         $stmt->close();
     }
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("sss", $username, $email, $hashed_password);
         
         if ($stmt->execute()) {
-            $success = "Registration successful! Ab aap login kar sakte hain.";
+            $success = "Registration successful! You can now login.";
             header('refresh:2;url=login.php');
         } else {
             $errors[] = "Registration failed. Please try again.";
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </svg>
             </div>
             <h2 class="text-3xl font-bold text-gray-800">Register</h2>
-            <p class="text-gray-600 mt-2">Naya account banayein</p>
+            <p class="text-gray-600 mt-2">Create a new account</p>
         </div>
 
         <?php if (!empty($errors)): ?>
@@ -134,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     name="username" 
                     value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>"
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200"
-                    placeholder="Username enter karein"
+                    placeholder="Enter username"
                 >
             </div>
 
@@ -204,8 +204,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <div class="mt-6 text-center">
             <p class="text-gray-600">
-                Pehle se account hai? 
-                <a href="login.php" class="text-indigo-600 hover:text-indigo-800 font-semibold">Login karein</a>
+                Already have an account? 
+                <a href="login.php" class="text-indigo-600 hover:text-indigo-800 font-semibold">Login</a>
             </p>
         </div>
     </div>

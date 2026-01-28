@@ -16,13 +16,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Validation
     if (empty($email)) {
-        $errors[] = "Email required hai";
+        $errors[] = "Email is required";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = "Valid email address enter karein";
+        $errors[] = "Please enter a valid email address";
     }
     
     if (empty($password)) {
-        $errors[] = "Password required hai";
+        $errors[] = "Password is required";
     }
     
     // Check credentials
@@ -45,10 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: dashboard.php');
                 exit();
             } else {
-                $errors[] = "Email ya password ghalat hai";
+                $errors[] = "Email or password is incorrect";
             }
         } else {
-            $errors[] = "Email ya password ghalat hai";
+            $errors[] = "Email or password is incorrect";
         }
         $stmt->close();
     }
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </svg>
             </div>
             <h2 class="text-3xl font-bold text-gray-800">Welcome Back</h2>
-            <p class="text-gray-600 mt-2">Apne account mein login karein</p>
+            <p class="text-gray-600 mt-2">Login to your account</p>
         </div>
 
         <?php if (!empty($errors)): ?>
@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="mt-6 text-center">
             <p class="text-gray-600">
                 Naya user? 
-                <a href="register.php" class="text-purple-600 hover:text-purple-800 font-semibold">Register karein</a>
+                <a href="register.php" class="text-purple-600 hover:text-purple-800 font-semibold">Register</a>
             </p>
         </div>
 

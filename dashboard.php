@@ -351,7 +351,7 @@ $stmt->close();
         }
 
         function logout() {
-            if (confirm('Kya aap logout karna chahte hain?')) {
+            if (confirm('Are you sure you want to logout?')) {
                 window.location.href = 'logout.php';
             }
         }
