@@ -8,7 +8,7 @@ if (isset($_SESSION['user_id'])) {
 }
 
 $errors = [];
-$success = '';
+$success = ''; 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
