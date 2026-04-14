@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitchat</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#ffffff;
+  /* Prevent any scrollbar from causing layout shift */
+  scrollbar-width:none;
+}
+body {
+  font-family:'Inter',sans-serif;
+  /* Lock the body — no drag, no select outside inputs */
+  user-select:none;
+  -webkit-user-select:none;
+  overflow:hidden;
+}
+:root {
+  --bc-purple:#6C3CE1;
+  --bc-purple-dark:#5A2FBF;
+  --bc-purple-soft:#ede9fd;
+  --bc-white:#ffffff;
+  --bc-surface:#f9f8ff;
+  --bc-text:#1c1c2e;
+  --bc-muted:#7b7b9a;
+  --bc-border:#e4e1f7;
+}
+
+/* ── Main window ── */
+#bc-window {
+  /* Fill iframe exactly — no overflow, no scroll, no extra width */
+  width:100vw;
+  height:100vh;
+  max-width:100%;
+  background:var(--bc-white);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  position:relative;
+}
+
+/* ── Header ── */
+.bc-header {
+  background:var(--bc-purple);
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-shrink:0;
+  width:100%;
+}
+.bc-header-left { display:flex; align-items:center; gap:10px; }
+.bc-header-avatar {
+  width:38px; height:38px;
+  background:rgba(255,255,255,0.15);
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.bc-header-name { font-size:15px; font-weight:600; color:white; line-height:1; }
+.bc-hbtn {
+  width:34px; height:34px;
+  background:rgba(255,255,255,0.1);
+  border:none; border-radius:8px;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background 0.18s;
+  flex-shrink:0;
+}
+.bc-hbtn:hover { background:rgba(255,255,255,0.22); }
+
+/* ── Suggestions ── */
+.bc-suggestions {
+  padding:12px 14px 9px;
+  background:var(--bc-surface);
+  border-bottom:1px solid var(--bc-border);
+  flex-shrink:0;
+  width:100%;
+}
+.bc-suggestions-label {
+  font-size:10px; font-weight:600;
+  color:var(--bc-muted);
+  text-transform:uppercase;
+  letter-spacing:0.6px;
+  margin-bottom:7px;
+}
+.bc-suggestion-btn {
+  display:inline-block;
+  background:var(--bc-white);
+  border:1px solid var(--bc-border);
+  border-radius:20px;
+  padding:6px 14px;
+  font-size:12.5px;
+  color:var(--bc-text);
+  cursor:pointer;
+  margin:3px 4px 3px 0;
+  font-family:inherit;
+  font-weight:500;
+  transition:all 0.18s;
+  user-select:none;
+}
+.bc-suggestion-btn:hover { background:var(--bc-purple); color:white; border-color:var(--bc-purple); }
+
+/* ── Messages scroll area ── */
+.bc-messages {
+  flex:1;
+  overflow-y:auto;
+  overflow-x:hidden;    /* ← no horizontal scroll = no layout shift */
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  scroll-behavior:smooth;
+  width:100%;
+  /* Custom scrollbar — thin, no width impact */
+  scrollbar-width:thin;
+  scrollbar-color:var(--bc-border) transparent;
+}
+.bc-messages::-webkit-scrollbar { width:3px; }
+.bc-messages::-webkit-scrollbar-thumb { background:var(--bc-border); border-radius:4px; }
+
+/* ── Message row ── */
+.bc-msg {
+  display:flex;
+  align-items:flex-end;
+  gap:8px;
+  width:100%;             /* ← fill row fully */
+  animation:bc-in 0.22s ease;
+}
+@keyframes bc-in {
+  from { opacity:0; transform:translateY(7px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.bc-msg.user {
+  flex-direction:row-reverse;
+}
+.bc-msg-av {
+  width:28px; height:28px;
+  border-radius:50%;
+  background:var(--bc-purple-soft);
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+
+/* ── BUBBLE — the core fix ── */
+/*
+  Key rules:
+  - display:block on the wrapper div so it participates in normal flow
+  - display:inline-block on bubble so it hugs text
+  - max-width:75% so long text wraps
+  - min-width:auto (NOT 2.5rem) — we fix short text differently
+  - NO width:max-content — this caused the layout overflow
+  - white-space:nowrap on bubble itself so short text ("hi") stays on one line
+    but we override to normal for longer text via JS (not needed actually)
+*/
+.bc-msg-body {
+  display:flex;
+  flex-direction:column;
+  max-width:75%;          /* ← limits both bubble + timestamp */
+}
+.bc-msg.user .bc-msg-body {
+  align-items:flex-end;
+}
+.bc-msg.bot .bc-msg-body {
+  align-items:flex-start;
+}
+
+.bc-bubble {
+  display:inline-block;
+  padding:9px 13px;
+  border-radius:14px;
+  font-size:14px;
+  line-height:1.5;
+  background:var(--bc-white);
+  border:1px solid var(--bc-border);
+  color:var(--bc-text);
+  border-bottom-left-radius:3px;
+  /* Text handling */
+  word-break:break-word;
+  overflow-wrap:break-word;
+  white-space:pre-wrap;   /* ← preserves spaces, wraps naturally, keeps single line for short text */
+  /* Sizing */
+  max-width:100%;         /* bounded by .bc-msg-body's max-width:75% */
+  /* NO width:max-content, NO min-width */
+}
+.bc-msg.user .bc-bubble {
+  background:var(--bc-purple);
+  color:white;
+  border:none;
+  border-bottom-left-radius:14px;
+  border-bottom-right-radius:3px;
+}
+
+.bc-time {
+  font-size:10px;
+  color:var(--bc-muted);
+  margin-top:4px;
+  padding:0 2px;
+  white-space:nowrap;
+}
+
+/* ── Typing indicator ── */
+.bc-typing-wrap {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:10px 14px;
+  background:var(--bc-white);
+  border:1px solid var(--bc-border);
+  border-radius:14px;
+  border-bottom-left-radius:3px;
+}
+.bc-typing-wrap span {
+  width:6px; height:6px;
+  background:var(--bc-purple);
+  border-radius:50%;
+  opacity:0.4;
+  animation:bc-dot 1.3s ease-in-out infinite;
+}
+.bc-typing-wrap span:nth-child(2) { animation-delay:0.2s; }
+.bc-typing-wrap span:nth-child(3) { animation-delay:0.4s; }
+@keyframes bc-dot {
+  0%,60%,100% { transform:translateY(0); opacity:0.4; }
+  30% { transform:translateY(-5px); opacity:1; }
+}
+
+/* ── Input row ── */
+.bc-input-row {
+  padding:12px 14px;
+  border-top:1px solid var(--bc-border);
+  display:flex;
+  align-items:flex-end;
+  gap:8px;
+  background:var(--bc-white);
+  flex-shrink:0;
+  width:100%;
+}
+#bc-input {
+  flex:1;
+  border:1px solid var(--bc-border);
+  border-radius:12px;
+  padding:10px 14px;
+  font-size:14px;
+  font-family:inherit;
+  color:var(--bc-text);
+  background:var(--bc-surface);
+  outline:none;
+  resize:none;          /* ← no resize handle */
+  min-height:42px;
+  max-height:100px;
+  transition:border-color 0.2s;
+  line-height:1.4;
+  user-select:text;     /* allow text selection inside input */
+  -webkit-user-select:text;
+  overflow-y:auto;
+}
+#bc-input:focus { border-color:var(--bc-purple); background:white; }
+#bc-input::placeholder { color:#c0bdd8; }
+
+#bc-send {
+  width:42px; height:42px;
+  border-radius:12px;
+  background:#e4e1f7;
+  border:none;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+  transition:all 0.2s;
+}
+#bc-send.active { background:var(--bc-purple); }
+#bc-send.active:hover { background:var(--bc-purple-dark); transform:scale(1.05); }
+
+/* ── Footer ── */
+.bc-footer-bar {
+  text-align:center;
+  padding:6px 14px 10px;
+  font-size:10px;
+  color:#c5c3d8;
+  background:var(--bc-white);
+  font-weight:500;
+  border-top:1px solid var(--bc-border);
+  flex-shrink:0;
+  width:100%;
+}
+.bc-footer-bar strong { color:var(--bc-purple); font-weight:600; }
+
+/* ── Responsive ── */
+@media (max-width:480px) {
+  .bc-bubble { font-size:13px; }
+  #bc-input  { font-size:13px; }
+  .bc-header { padding:12px 14px; }
+}
+</style>
+</head>
+<body>
+<div id="bc-window">
+
+  <!-- HEADER -->
+  <div class="bc-header">
+    <div class="bc-header-left">
+      <div class="bc-header-avatar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="6" width="18" height="14" rx="4" stroke="rgba(255,255,255,0.85)" stroke-width="1.8"/>
+          <circle cx="9" cy="13" r="1.5" fill="rgba(255,255,255,0.85)"/>
+          <circle cx="15" cy="13" r="1.5" fill="rgba(255,255,255,0.85)"/>
+        </svg>
+      </div>
+      <div class="bc-header-name">Bitchat Assistant</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <button class="bc-hbtn" onclick="bcNewChat()" title="New Chat">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M12 5H5C3.9 5 3 5.9 3 7V19C3 20.1 3.9 21 5 21H17C18.1 21 19 20.1 19 19V12"
+            stroke="rgba(255,255,255,0.85)" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M17.5 3.5a2.121 2.121 0 013 3L13 14l-4 1 1-4 6.5-7.5z"
+            stroke="rgba(255,255,255,0.85)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="bc-hbtn" onclick="bcDownload()" title="Download">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"
+            stroke="rgba(255,255,255,0.85)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- SUGGESTIONS -->
+  <div class="bc-suggestions" id="bc-suggestions">
+    <div class="bc-suggestions-label">Common questions</div>
+    <div id="bc-suggestion-pills"></div>
+  </div>
+
+  <!-- MESSAGES -->
+  <div class="bc-messages" id="bc-messages">
+    <!-- Initial bot message -->
+    <div class="bc-msg bot">
+      <div class="bc-msg-av">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="6" width="18" height="14" rx="4" stroke="#6C3CE1" stroke-width="2"/>
+          <circle cx="9" cy="13" r="1.5" fill="#6C3CE1"/>
+          <circle cx="15" cy="13" r="1.5" fill="#6C3CE1"/>
+        </svg>
+      </div>
+      <div class="bc-msg-body">
+        <div class="bc-bubble">Hi! How can I assist you today?</div>
+        <div class="bc-time">Just now</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <div class="bc-input-row">
+    <textarea id="bc-input" placeholder="Type your question..." rows="1"
+      onkeydown="bcKey(event)" oninput="bcResize(this);bcToggleSend(this)"></textarea>
+    <button id="bc-send" onclick="bcSend()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"
+          stroke="#a09bbf" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+          id="send-icon"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="bc-footer-bar">Powered by <strong>Bitchat</strong></div>
+
+</div><!-- /#bc-window -->
+
+<script>
+const BC = {
+  webhook:   'https://n8n.turbotoolz.online/webhook/chat',
+  siteId:    null,
+  sessionId: null,
+  messages:  []
+};
+
+/* ── Helpers ── */
+function bcGetSiteId() {
+  const p = new URLSearchParams(window.location.search);
+  return p.get('site') || p.get('collection') || p.get('siteId') || null;
+}
+
+function bcGetOrCreateSession(siteId) {
+  const key = 'bc_sid_' + siteId;
+  try {
+    const s = JSON.parse(localStorage.getItem(key) || 'null');
+    if (s && s.sid && (Date.now() - s.ts) < 600000) {
+      s.ts = Date.now();
+      localStorage.setItem(key, JSON.stringify(s));
+      return s.sid;
+    }
+  } catch(e) {}
+  const sid = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2,6);
+  localStorage.setItem(key, JSON.stringify({ sid, ts: Date.now() }));
+  return sid;
+}
+
+function bcUpdateSessionActivity(siteId) {
+  const key = 'bc_sid_' + siteId;
+  try {
+    const s = JSON.parse(localStorage.getItem(key) || 'null');
+    if (s) { s.ts = Date.now(); localStorage.setItem(key, JSON.stringify(s)); }
+  } catch(e) {}
+}
+
+function bcGetSuggestions(siteId) {
+  const map = {
+    gym_qa:      ['Gym timings?', 'Membership plans?', 'Personal trainer?'],
+    swimming_qa: ['Pool timings?', 'Swimming classes?', 'Monthly fee?'],
+  };
+  return map[siteId] || ['How can you help?', 'Tell me more', 'Contact support'];
+}
+
+function bcTime() {
+  return new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+}
+
+function bcEsc(t) {
+  return String(t)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+/* ── Bot avatar SVG ── */
+const BOT_AV = `<div class="bc-msg-av">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+    <rect x="3" y="6" width="18" height="14" rx="4" stroke="#6C3CE1" stroke-width="2"/>
+    <circle cx="9" cy="13" r="1.5" fill="#6C3CE1"/>
+    <circle cx="15" cy="13" r="1.5" fill="#6C3CE1"/>
+  </svg>
+</div>`;
+
+/* ── Init ── */
+window.addEventListener('DOMContentLoaded', function () {
+  const siteId = bcGetSiteId();
+  if (!siteId) {
+    document.getElementById('bc-messages').innerHTML =
+      '<div style="padding:20px;text-align:center;color:#e53e3e;font-size:13px;">⚠️ No site ID provided.</div>';
+    return;
+  }
+  BC.siteId    = siteId;
+  BC.sessionId = bcGetOrCreateSession(siteId);
+  BC.messages  = [{ role:'bot', text:'Hi! How can I assist you today?', time:'Just now' }];
+
+  // Suggestion pills
+  const pills = bcGetSuggestions(siteId);
+  const cont  = document.getElementById('bc-suggestion-pills');
+  pills.forEach(function (txt) {
+    const btn = document.createElement('button');
+    btn.className   = 'bc-suggestion-btn';
+    btn.textContent = txt;
+    btn.onclick     = function () { bcPickSuggestion(btn); };
+    cont.appendChild(btn);
+  });
+
+  document.getElementById('bc-input').focus();
+});
+
+/* ── UI helpers ── */
+function bcToggleSend(el) {
+  const active = el.value.trim().length > 0;
+  const btn = document.getElementById('bc-send');
+  btn.classList.toggle('active', active);
+  document.getElementById('send-icon').setAttribute('stroke', active ? 'white' : '#a09bbf');
+}
+
+function bcResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function bcKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); bcSend(); }
+}
+
+function bcPickSuggestion(btn) {
+  document.getElementById('bc-suggestions').style.display = 'none';
+  document.getElementById('bc-input').value = btn.textContent.trim();
+  bcToggleSend(document.getElementById('bc-input'));
+  bcSend();
+}
+
+/* ── Add message ── */
+function bcAddMsg(text, isUser) {
+  const t  = bcTime();
+  BC.messages.push({ role: isUser ? 'user' : 'bot', text, time: t });
+
+  const wrap = document.getElementById('bc-messages');
+  const row  = document.createElement('div');
+  row.className = 'bc-msg ' + (isUser ? 'user' : 'bot');
+
+  if (isUser) {
+    row.innerHTML = `
+      <div class="bc-msg-body">
+        <div class="bc-bubble">${bcEsc(text)}</div>
+        <div class="bc-time">${t}</div>
+      </div>`;
+  } else {
+    row.innerHTML = `
+      ${BOT_AV}
+      <div class="bc-msg-body">
+        <div class="bc-bubble">${bcEsc(text)}</div>
+        <div class="bc-time">${t}</div>
+      </div>`;
+  }
+
+  wrap.appendChild(row);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+/* ── Typing indicator ── */
+function bcShowTyping() {
+  const wrap = document.getElementById('bc-messages');
+  const row  = document.createElement('div');
+  row.className = 'bc-msg bot';
+  row.id        = 'bc-typing';
+  row.innerHTML = `
+    ${BOT_AV}
+    <div class="bc-typing-wrap">
+      <span></span><span></span><span></span>
+    </div>`;
+  wrap.appendChild(row);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function bcHideTyping() {
+  const t = document.getElementById('bc-typing');
+  if (t) t.remove();
+}
+
+/* ── New chat ── */
+function bcNewChat() {
+  const key = 'bc_sid_' + BC.siteId;
+  try { localStorage.removeItem(key); } catch(e) {}
+  BC.sessionId = bcGetOrCreateSession(BC.siteId);
+  BC.messages  = [{ role:'bot', text:'Hi! How can I assist you today?', time:'Just now' }];
+
+  document.getElementById('bc-messages').innerHTML = `
+    <div class="bc-msg bot">
+      ${BOT_AV}
+      <div class="bc-msg-body">
+        <div class="bc-bubble">Hi! How can I assist you today?</div>
+        <div class="bc-time">Just now</div>
+      </div>
+    </div>`;
+
+  const sug = document.getElementById('bc-suggestions');
+  if (sug) sug.style.display = '';
+}
+
+/* ── Download ── */
+function bcDownload() {
+  let txt = 'Bitchat Conversation\n' + new Date().toLocaleString() +
+            '\nSite: ' + BC.siteId + '\nSession: ' + BC.sessionId + '\n\n';
+  BC.messages.forEach(function (m) {
+    txt += (m.role === 'user' ? 'You' : 'Bitchat') + ' [' + m.time + ']: ' + m.text + '\n\n';
+  });
+  const a = document.createElement('a');
+  a.href     = 'data:text/plain;charset=utf-8,' + encodeURIComponent(txt);
+  a.download = 'bitchat-' + BC.siteId + '-' + Date.now() + '.txt';
+  a.click();
+}
+
+/* ── Send ── */
+async function bcSend() {
+  if (!BC.siteId || !BC.sessionId) return;
+  const inp  = document.getElementById('bc-input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  inp.value = '';
+  inp.style.height = 'auto';
+  const btn = document.getElementById('bc-send');
+  btn.classList.remove('active');
+  document.getElementById('send-icon').setAttribute('stroke', '#a09bbf');
+
+  bcAddMsg(text, true);
+  bcShowTyping();
+  bcUpdateSessionActivity(BC.siteId);
+
+  try {
+    const res = await fetch(BC.webhook, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        question:   text,
+        collection: BC.siteId,
+        siteId:     BC.siteId,
+        sessionId:  BC.sessionId
+      })
+    });
+    const data = await res.json();
+    bcHideTyping();
+    bcAddMsg(data.answer || data.message || 'Sorry, no answer found.', false);
+  } catch(e) {
+    bcHideTyping();
+    bcAddMsg('Sorry, something went wrong. Please try again.', false);
+  }
+}
+</script>
+</body>
+</html>
