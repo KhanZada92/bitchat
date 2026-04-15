@@ -182,40 +182,96 @@
 <!-- ================= PRICING ================= -->
 <section id="pricing" class="py-24 bg-[#0F1525]">
     <div class="max-w-7xl mx-auto px-6">
-        <h2 class="text-4xl font-bold text-center mb-16">Pricing Plans</h2>
-        <div class="grid md:grid-cols-3 gap-8">
-            <div class="p-8 rounded-2xl bg-white/5 border border-white/10 text-center">
-                <h3 class="text-xl font-semibold mb-4">Starter</h3>
-                <p class="text-4xl font-bold mb-6">$19</p>
-                <ul class="space-y-2 text-gray-400 mb-6">
-                    <li>1 Chatbot</li>
-                    <li>1,000 Messages</li>
-                    <li>Email Support</li>
+        <h2 class="text-4xl font-bold text-center mb-4">Pricing Plans</h2>
+        <p class="text-center text-gray-400 mb-16">Choose a plan that fits your business</p>
+
+        <div class="grid md:grid-cols-3 gap-8 items-center">
+
+            <!-- BASIC -->
+            <div class="relative rounded-2xl p-8 text-center overflow-hidden"
+                 style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);">
+                <div class="absolute top-0 left-0 right-0 h-0.5"
+                     style="background:linear-gradient(90deg,#10B981,#059669);"></div>
+                <div class="text-4xl mb-3">🎟️</div>
+                <h3 class="text-xl font-bold mb-2">Basic</h3>
+                <p class="text-4xl font-extrabold mb-1">$10</p>
+                <p class="text-gray-400 text-sm mb-6">/month</p>
+                <ul class="space-y-3 text-gray-400 text-sm mb-8 text-left">
+                    <li class="flex items-center gap-2 border-b border-white/5 pb-2"><span class="text-green-400">✓</span> 1 Chatbot Agent</li>
+                    <li class="flex items-center gap-2 border-b border-white/5 pb-2"><span class="text-green-400">✓</span> 10 MB Upload Limit</li>
+                    <li class="flex items-center gap-2 border-b border-white/5 pb-2"><span class="text-green-400">✓</span> Email Support</li>
+                    <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Standard AI</li>
                 </ul>
-                <button class="w-full py-3 bg-white/10 rounded-xl hover:bg-white/20 transition">Get Started</button>
+                <?php
+                  $basic_url = isset($_SESSION['user_id'])
+                    ? 'select_plan.php?plan=basic'
+                    : 'register.php?plan=basic';
+                ?>
+                <a href="<?php echo $basic_url; ?>"
+                   class="block w-full py-3 rounded-xl font-bold text-sm transition"
+                   style="background:rgba(16,185,129,0.15);color:#34D399;border:1px solid rgba(16,185,129,0.3);">
+                    Get Started →
+                </a>
             </div>
 
-            <div class="p-8 rounded-2xl bg-indigo-600 text-white scale-105 text-center">
-                <h3 class="text-xl font-semibold mb-4">Pro</h3>
-                <p class="text-4xl font-bold mb-6">$49</p>
-                <ul class="space-y-2 mb-6">
-                    <li>Unlimited Messages</li>
-                    <li>Advanced AI</li>
-                    <li>Priority Support</li>
+            <!-- STARTER (Featured) -->
+            <div class="relative rounded-2xl p-8 text-center overflow-hidden scale-105"
+                 style="background:rgba(79,70,229,0.15);border:1px solid rgba(99,102,241,0.35);">
+                <div class="absolute top-0 left-0 right-0 h-0.5"
+                     style="background:linear-gradient(90deg,#4F46E5,#7C3AED);"></div>
+                <div class="inline-block mb-3 px-3 py-1 rounded-full text-xs font-bold tracking-widest"
+                     style="background:rgba(79,70,229,0.2);border:1px solid rgba(99,102,241,0.4);color:#A78BFA;">
+                    ⭐ MOST POPULAR
+                </div>
+                <div class="text-4xl mb-3">⭐</div>
+                <h3 class="text-xl font-bold mb-2">Starter</h3>
+                <p class="text-4xl font-extrabold mb-1">$20</p>
+                <p class="text-gray-400 text-sm mb-6">/month</p>
+                <ul class="space-y-3 text-gray-400 text-sm mb-8 text-left">
+                    <li class="flex items-center gap-2 border-b border-white/5 pb-2"><span class="text-indigo-400">✓</span> 5 Chatbot Agents</li>
+                    <li class="flex items-center gap-2 border-b border-white/5 pb-2"><span class="text-indigo-400">✓</span> 50 MB Upload Limit</li>
+                    <li class="flex items-center gap-2 border-b border-white/5 pb-2"><span class="text-indigo-400">✓</span> Priority Support</li>
+                    <li class="flex items-center gap-2"><span class="text-indigo-400">✓</span> Advanced AI</li>
                 </ul>
-                <button class="w-full py-3 bg-white text-indigo-600 rounded-xl font-semibold hover:bg-gray-100 transition">Most Popular</button>
+                <?php
+                  $starter_url = isset($_SESSION['user_id'])
+                    ? 'select_plan.php?plan=starter'
+                    : 'register.php?plan=starter';
+                ?>
+                <a href="<?php echo $starter_url; ?>"
+                   class="block w-full py-3 rounded-xl font-bold text-sm text-white transition"
+                   style="background:linear-gradient(135deg,#4F46E5,#7C3AED);">
+                    Get Started →
+                </a>
             </div>
 
-            <div class="p-8 rounded-2xl bg-white/5 border border-white/10 text-center">
-                <h3 class="text-xl font-semibold mb-4">Enterprise</h3>
-                <p class="text-4xl font-bold mb-6">Custom</p>
-                <ul class="space-y-2 text-gray-400 mb-6">
-                    <li>Custom Integrations</li>
-                    <li>Dedicated Manager</li>
-                    <li>SLA</li>
+            <!-- PRO -->
+            <div class="relative rounded-2xl p-8 text-center overflow-hidden"
+                 style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);">
+                <div class="absolute top-0 left-0 right-0 h-0.5"
+                     style="background:linear-gradient(90deg,#06B6D4,#4F46E5);"></div>
+                <div class="text-4xl mb-3">🏆</div>
+                <h3 class="text-xl font-bold mb-2">Pro</h3>
+                <p class="text-4xl font-extrabold mb-1">$30</p>
+                <p class="text-gray-400 text-sm mb-6">/month</p>
+                <ul class="space-y-3 text-gray-400 text-sm mb-8 text-left">
+                    <li class="flex items-center gap-2 border-b border-white/5 pb-2"><span class="text-cyan-400">✓</span> 10 Chatbot Agents</li>
+                    <li class="flex items-center gap-2 border-b border-white/5 pb-2"><span class="text-cyan-400">✓</span> 200 MB Upload Limit</li>
+                    <li class="flex items-center gap-2 border-b border-white/5 pb-2"><span class="text-cyan-400">✓</span> Dedicated Manager</li>
+                    <li class="flex items-center gap-2"><span class="text-cyan-400">✓</span> Pro AI + Integrations</li>
                 </ul>
-                <button class="w-full py-3 bg-white/10 rounded-xl hover:bg-white/20 transition">Contact Sales</button>
+                <?php
+                  $pro_url = isset($_SESSION['user_id'])
+                    ? 'select_plan.php?plan=pro'
+                    : 'register.php?plan=pro';
+                ?>
+                <a href="<?php echo $pro_url; ?>"
+                   class="block w-full py-3 rounded-xl font-bold text-sm transition"
+                   style="background:rgba(6,182,212,0.15);color:#22D3EE;border:1px solid rgba(6,182,212,0.3);">
+                    Get Started →
+                </a>
             </div>
+
         </div>
     </div>
 </section>
