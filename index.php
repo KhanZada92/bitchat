@@ -275,11 +275,10 @@
     </div>
 </section>
 
-<!-- ================= PRICING (exact select_plan.php design) ================= -->
+<!-- ================= PRICING ================= -->
 <section id="pricing" class="py-24" style="background:#060609;">
     <div class="max-w-5xl mx-auto px-6">
 
-        <!-- Header -->
         <div style="text-align:center;margin-bottom:64px;">
             <div style="display:inline-flex;align-items:center;gap:8px;padding:6px 18px;background:rgba(108,71,255,0.09);border:1px solid rgba(108,71,255,0.18);border-radius:999px;font-size:12.5px;font-weight:600;color:#A78BFA;margin-bottom:24px;letter-spacing:0.02em;font-family:'DM Sans',sans-serif;">
                 <div style="width:6px;height:6px;border-radius:50%;background:#6C47FF;box-shadow:0 0 8px #6C47FF;"></div>
@@ -293,9 +292,7 @@
             </p>
         </div>
 
-        <!-- Cards Grid -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:center;margin-bottom:52px;">
-
+        <div id="pricing-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:center;margin-bottom:52px;">
             <?php
             $basic_url   = isset($_SESSION['user_id']) ? 'select_plan.php?plan=basic'   : 'register.php?plan=basic';
             $starter_url = isset($_SESSION['user_id']) ? 'select_plan.php?plan=starter' : 'register.php?plan=starter';
@@ -314,12 +311,12 @@
                 <hr class="sp-cdiv">
                 <div class="sp-feats">
                     <?php foreach ([
-                        [true,  'fi-y',  'ftext',   '1 AI Chatbot Agent'],
-                        [true,  'fi-y',  'ftext',   'Embed on 1 website'],
-                        [true,  'fi-y',  'ftext',   'Upload FAQ / PDF / JSON'],
-                        [true,  'fi-y',  'ftext',   'Chat history & analytics'],
-                        [false, 'fi-n',  'ftext',   'Chatbot customization'],
-                        [false, 'fi-n',  'ftext',   'Priority support'],
+                        [true,  'fi-y', 'ftext', '1 AI Chatbot Agent'],
+                        [true,  'fi-y', 'ftext', 'Embed on 1 website'],
+                        [true,  'fi-y', 'ftext', 'Upload FAQ / PDF / JSON'],
+                        [true,  'fi-y', 'ftext', 'Chat history & analytics'],
+                        [false, 'fi-n', 'ftext', 'Chatbot customization'],
+                        [false, 'fi-n', 'ftext', 'Priority support'],
                     ] as [$ok, $ic, $tc, $label]): ?>
                     <div class="sp-feat <?php echo !$ok ? 'sp-feat-off' : ''; ?>">
                         <div class="sp-ficon sp-<?php echo $ic; ?>">
@@ -402,15 +399,6 @@
             </div>
 
         </div>
-
-        <!-- Trust bar -->
-        <div style="display:flex;align-items:center;justify-content:center;gap:28px;font-size:12.5px;color:#28283C;flex-wrap:wrap;font-family:'DM Sans',sans-serif;">
-            <span>🔒 256-bit SSL</span>
-            <span>💳 Stripe Payments</span>
-            <span>↩️ Cancel anytime</span>
-            <span>⚡ Instant activation</span>
-        </div>
-
     </div>
 </section>
 
@@ -507,54 +495,158 @@
   $chat_url = 'https://bitchatbot.io/chat' . ($site_id ? '?site=' . $site_id : '');
 ?>
 
+<!-- Widget Root -->
 <div id="bitchat-root" style="position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;align-items:flex-end;gap:12px;font-family:'Inter',sans-serif;">
-  <div id="bc-frame-wrap" style="width:360px;max-height:500px;border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(108,60,225,0.2),0 4px 16px rgba(0,0,0,0.08);border:1px solid #e4e1f7;display:none;transform-origin:bottom right;transform:scale(0.88) translateY(12px);opacity:0;transition:all 0.32s cubic-bezier(0.34,1.56,0.64,1);">
-    <iframe id="bc-iframe" src="<?php echo htmlspecialchars($chat_url); ?>" style="width:100%;height:500px;border:none;display:block;" frameborder="0" allow="microphone" title="Bitchat Assistant"></iframe>
+
+  <!-- Chat Frame — fixed 330x440 -->
+  <div id="bc-frame-wrap" style="
+    width:330px;
+    height:440px;
+    border-radius:18px;
+    overflow:hidden;
+    box-shadow:0 20px 60px rgba(108,60,225,0.2),0 4px 16px rgba(0,0,0,0.08);
+    border:1px solid #e4e1f7;
+    display:none;
+    transform-origin:bottom right;
+    transform:scale(0.88) translateY(12px);
+    opacity:0;
+    transition:all 0.32s cubic-bezier(0.34,1.56,0.64,1);
+  ">
+    <iframe
+      id="bc-iframe"
+      src="<?php echo htmlspecialchars($chat_url); ?>"
+      style="width:100%;height:440px;border:none;display:block;"
+      frameborder="0"
+      allow="microphone"
+      title="Bitchat Assistant">
+    </iframe>
   </div>
-  <button id="bc-toggle-btn" onclick="bcWidgetToggle()" style="display:flex;align-items:center;gap:9px;background:#6C3CE1;border:none;border-radius:50px;cursor:pointer;padding:0 18px 0 13px;height:50px;box-shadow:0 6px 24px rgba(108,60,225,0.35);transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);">
+
+  <!-- Toggle Button -->
+  <button id="bc-toggle-btn" onclick="bcWidgetToggle()" style="
+    display:flex;
+    align-items:center;
+    gap:9px;
+    background:#6C3CE1;
+    border:none;
+    border-radius:50px;
+    cursor:pointer;
+    padding:0 18px 0 13px;
+    height:50px;
+    box-shadow:0 6px 24px rgba(108,60,225,0.35);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  ">
     <div style="width:26px;height:26px;background:rgba(255,255,255,0.18);border-radius:50%;display:flex;align-items:center;justify-content:center;">
-      <svg id="bc-ico-chat" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 15C21 15.53 20.79 16.04 20.41 16.41C20.04 16.79 19.53 17 19 17H7L3 21V5C3 4.47 3.21 3.96 3.59 3.59C3.96 3.21 4.47 3 5 3H19C19.53 3 20.04 3.21 20.41 3.59C20.79 3.96 21 4.47 21 5V15Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <svg id="bc-ico-close" width="15" height="15" viewBox="0 0 24 24" fill="none" style="display:none"><path d="M18 6L6 18M6 6L18 18" stroke="white" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <!-- Chat icon — shown when closed -->
+      <svg id="bc-ico-chat" width="15" height="15" viewBox="0 0 24 24" fill="none">
+        <path d="M21 15C21 15.53 20.79 16.04 20.41 16.41C20.04 16.79 19.53 17 19 17H7L3 21V5C3 4.47 3.21 3.96 3.59 3.59C3.96 3.21 4.47 3 5 3H19C19.53 3 20.04 3.21 20.41 3.59C20.79 3.96 21 4.47 21 5V15Z"
+          stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <!-- Close (X) icon — shown when open -->
+      <svg id="bc-ico-close" width="15" height="15" viewBox="0 0 24 24" fill="none" style="display:none;">
+        <path d="M18 6L6 18M6 6L18 18" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
     </div>
     <span id="bc-btn-label" style="font-size:13.5px;font-weight:600;color:white;letter-spacing:0.1px;white-space:nowrap;font-family:Inter,sans-serif;">Bitchat</span>
   </button>
+
 </div>
 
 <style>
-@media (max-width: 480px) {
-  #bc-frame-wrap { position:fixed !important;bottom:0 !important;left:0 !important;right:0 !important;width:100% !important;max-height:70vh !important;border-radius:20px 20px 0 0 !important; }
-  #bc-iframe { height:70vh !important; }
-  #bitchat-root { bottom:16px !important;right:16px !important; }
+/* ── Pricing Grid Responsive ── */
+#pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 52px;
 }
-@media (min-width:481px) and (max-width:768px) { #bc-frame-wrap { width:320px !important; } }
-/* Pricing responsive */
 @media (max-width: 840px) {
-  #pricing-grid { grid-template-columns: 1fr !important; max-width: 390px; margin-left: auto; margin-right: auto; }
+  #pricing-grid {
+    grid-template-columns: 1fr !important;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+  }
   .sp-c-starter { transform: none !important; }
+}
+@media (max-width: 480px) {
+  #pricing-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+    padding: 0 12px;
+  }
+}
+
+/* ── Widget Mobile: slide up from bottom full-width ── */
+@media (max-width: 480px) {
+  #bitchat-root {
+    bottom: 16px !important;
+    right: 16px !important;
+  }
+  #bc-frame-wrap {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 440px !important;
+    border-radius: 20px 20px 0 0 !important;
+    transform-origin: bottom center !important;
+  }
+  #bc-iframe {
+    height: 440px !important;
+  }
 }
 </style>
 
 <script>
 var bcOpen = false;
+
 function bcWidgetToggle() {
-    bcOpen = !bcOpen;
-    var wrap=document.getElementById('bc-frame-wrap'),chatIco=document.getElementById('bc-ico-chat'),closeIco=document.getElementById('bc-ico-close'),label=document.getElementById('bc-btn-label'),btn=document.getElementById('bc-toggle-btn');
-    if (bcOpen) {
-        wrap.style.display='block';
-        setTimeout(function(){wrap.style.transform='scale(1) translateY(0)';wrap.style.opacity='1';},10);
-        chatIco.style.display='none';closeIco.style.display='block';label.style.display='none';btn.style.padding='0 13px';
-    } else {
-        wrap.style.transform='scale(0.88) translateY(12px)';wrap.style.opacity='0';
-        setTimeout(function(){wrap.style.display='none';},320);
-        chatIco.style.display='block';closeIco.style.display='none';label.style.display='inline';btn.style.padding='0 18px 0 13px';
-    }
+  bcOpen = !bcOpen;
+
+  var wrap     = document.getElementById('bc-frame-wrap');
+  var chatIco  = document.getElementById('bc-ico-chat');
+  var closeIco = document.getElementById('bc-ico-close');
+  var label    = document.getElementById('bc-btn-label');
+  var btn      = document.getElementById('bc-toggle-btn');
+
+  if (bcOpen) {
+    // Open chatbot
+    wrap.style.display = 'block';
+    setTimeout(function () {
+      wrap.style.transform = 'scale(1) translateY(0)';
+      wrap.style.opacity   = '1';
+    }, 10);
+    // Switch to X icon, hide label
+    chatIco.style.display  = 'none';
+    closeIco.style.display = 'block';
+    label.style.display    = 'none';
+    btn.style.padding      = '0 13px';
+  } else {
+    // Close chatbot
+    wrap.style.transform = 'scale(0.88) translateY(12px)';
+    wrap.style.opacity   = '0';
+    setTimeout(function () {
+      wrap.style.display = 'none';
+    }, 320);
+    // Switch back to chat icon, show label
+    chatIco.style.display  = 'block';
+    closeIco.style.display = 'none';
+    label.style.display    = 'inline';
+    btn.style.padding      = '0 18px 0 13px';
+  }
 }
-document.querySelectorAll('.faq-toggle').forEach(function(toggle) {
-    toggle.addEventListener('click', function() {
-        var content=toggle.nextElementSibling,plus=toggle.querySelector('span:last-child');
-        content.classList.toggle('hidden');
-        plus.textContent=content.classList.contains('hidden')?'+':'-';
-    });
+
+// FAQ accordion
+document.querySelectorAll('.faq-toggle').forEach(function (toggle) {
+  toggle.addEventListener('click', function () {
+    var content = toggle.nextElementSibling;
+    var plus    = toggle.querySelector('span:last-child');
+    content.classList.toggle('hidden');
+    plus.textContent = content.classList.contains('hidden') ? '+' : '-';
+  });
 });
 </script>
 </body>

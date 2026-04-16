@@ -36,7 +36,7 @@
     #bitchat-btn:hover { transform:scale(1.08); }
     #bitchat-box {
       position:fixed; bottom:90px; right:24px; z-index:9998;
-      width:360px; height:520px; border-radius:16px;
+      width:330px; height:440px; border-radius:16px;
       background:#111118; border:1px solid rgba(255,255,255,0.08);
       box-shadow:0 8px 40px rgba(0,0,0,0.5);
       display:none; flex-direction:column; overflow:hidden;
@@ -46,13 +46,17 @@
     #bc-header {
       background:linear-gradient(135deg,#7C3AED,#06B6D4);
       padding:14px 16px; display:flex; align-items:center;
-      justify-content:space-between;
+      justify-content:space-between; flex-shrink:0;
     }
     #bc-header .bc-title { color:white; font-weight:700; font-size:14px; }
     #bc-header .bc-close {
       background:none; border:none; color:white; cursor:pointer;
-      font-size:18px; line-height:1; padding:0;
+      font-size:22px; line-height:1; padding:0 4px;
+      display:flex; align-items:center; justify-content:center;
+      width:28px; height:28px; border-radius:6px;
+      transition:background 0.15s;
     }
+    #bc-header .bc-close:hover { background:rgba(255,255,255,0.2); }
     #bc-messages {
       flex:1; overflow-y:auto; padding:14px;
       display:flex; flex-direction:column; gap:10px;
@@ -79,7 +83,7 @@
     }
     #bc-input-row {
       padding:10px 12px; border-top:1px solid rgba(255,255,255,0.07);
-      display:flex; gap:8px; background:#0A0A0F;
+      display:flex; gap:8px; background:#0A0A0F; flex-shrink:0;
     }
     #bc-input {
       flex:1; background:#1A1A26; border:1px solid rgba(255,255,255,0.08);
@@ -96,7 +100,23 @@
     #bc-send:disabled { background:#4B5563; cursor:not-allowed; }
     #bc-site-label {
       text-align:center; font-size:10px; color:#374151;
-      padding:4px 0 6px; background:#0A0A0F;
+      padding:4px 0 6px; background:#0A0A0F; flex-shrink:0;
+    }
+
+    /* ── Mobile Responsive ── */
+    @media (max-width:480px) {
+      #bitchat-box {
+        width:calc(100vw - 24px) !important;
+        right:12px !important;
+        left:12px !important;
+        bottom:80px !important;
+        height:440px !important;
+        border-radius:16px !important;
+      }
+      #bitchat-btn {
+        bottom:16px !important;
+        right:16px !important;
+      }
     }
   `;
   document.head.appendChild(style);
@@ -114,7 +134,7 @@
   box.innerHTML = `
     <div id="bc-header">
       <span class="bc-title">💬 Chat with us</span>
-      <button class="bc-close" id="bc-close-btn">×</button>
+      <button class="bc-close" id="bc-close-btn">&#x2715;</button>
     </div>
     <div id="bc-messages"></div>
     <div id="bc-input-row">
@@ -135,6 +155,7 @@
       hasGreeted = true;
     }
   });
+
   document.getElementById('bc-close-btn').addEventListener('click', () => {
     box.classList.remove('open');
   });
@@ -178,17 +199,16 @@
     showTyping();
 
     try {
-      // ── IMPORTANT: siteId MUST be sent here ──
       const res = await fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          siteId:    SITE_ID,      // ← primary field
-          site_id:   SITE_ID,      // ← backup field
-          collection: SITE_ID,     // ← n8n workflow bhi check karta hai
-          sessionId: sessionId,
-          chatInput: msg,
-          question:  msg
+          siteId:     SITE_ID,
+          site_id:    SITE_ID,
+          collection: SITE_ID,
+          sessionId:  sessionId,
+          chatInput:  msg,
+          question:   msg
         })
       });
 

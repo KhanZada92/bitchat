@@ -233,7 +233,7 @@ body { background:var(--bg); color:var(--text); }
     <div style="display:flex;align-items:center;gap:10px;">
         <div style="text-align:right;" class="hidden md:block">
             <p style="font-size:13px;font-weight:600;color:white;"><?php echo htmlspecialchars($username); ?></p>
-            <p style="font-size:11px;color:var(--muted);"><?php echo htmlspecialchars($site_id ?: 'No site yet'); ?></p>
+<p style="font-size:11px;color:var(--muted);">Chatbot Connected</p>
         </div>
         <a href="logout.php" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#F87171;padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:600;text-decoration:none;">Logout</a>
     </div>
@@ -357,55 +357,116 @@ body { background:var(--bg); color:var(--text); }
 <!-- UPLOAD -->
 <section id="upload-section" style="display:none;">
     <h1 style="font-size:22px;font-weight:800;color:white;margin-bottom:6px;">Upload Chatbot Data</h1>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:24px;">Supported: JSON, DOCX, PDF · Limit: <strong style="color:#A78BFA;"><?php echo $upload_limit; ?>MB</strong></p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
-        <div>
-            <div style="background:#0D0D14;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
-                <p style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">JSON Format</p>
-                <pre style="color:#34D399;font-size:12px;overflow-x:auto;font-family:monospace;">[{"question":"Timings?","answer":"9AM-9PM"}]</pre>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">
+        Supported: DOCX, PDF · Limit: <strong style="color:#A78BFA;"><?php echo $upload_limit; ?>MB</strong>
+    </p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:flex-start;">
+
+        <!-- LEFT SIDE -->
+        <div style="max-width:420px;">
+
+            <!-- DROP ZONE -->
+            <div class="drop-zone" id="dropZone"
+                onclick="document.getElementById('fileInput').click()"
+                ondragover="event.preventDefault();this.classList.add('drag-over')"
+                ondragleave="this.classList.remove('drag-over')"
+                ondrop="handleDrop(event)"
+                style="padding:36px;">
+
+                <svg class="w-8 h-8 mx-auto mb-2" style="color:#7C3AED;opacity:0.7;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+
+                <p style="color:white;font-weight:600;font-size:13px;">Drop file or click</p>
+                <p style="color:var(--muted);font-size:11px;margin-top:3px;">
+                    JSON, DOCX, PDF · Max <?php echo $upload_limit; ?>MB
+                </p>
+
+                <p id="selectedFile"
+                   style="margin-top:8px;color:#A78BFA;font-size:12px;font-weight:600;display:none;">
+                </p>
+
+                <input type="file" id="fileInput" accept=".json,.docx,.pdf"
+                       style="display:none;" onchange="handleFileSelect(this)">
             </div>
-            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event)">
-                <svg class="w-10 h-10 mx-auto mb-3" style="color:#7C3AED;opacity:0.7;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                <p style="color:white;font-weight:600;font-size:14px;margin-bottom:4px;">Drop file here or click to browse</p>
-                <p style="color:var(--muted);font-size:12px;">JSON, DOCX, PDF · Max <?php echo $upload_limit; ?>MB</p>
-                <p id="selectedFile" style="margin-top:10px;color:#A78BFA;font-size:13px;font-weight:600;display:none;"></p>
-                <input type="file" id="fileInput" accept=".json,.docx,.pdf" style="display:none;" onchange="handleFileSelect(this)">
-            </div>
-            <button id="uploadBtn" onclick="uploadFile()" disabled class="btn-primary" style="width:100%;margin-top:12px;padding:12px;">Upload & Process</button>
-            <div id="uploadProgress" style="display:none;margin-top:12px;" class="card-sm">
-                <div style="padding:16px;">
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                        <div style="width:16px;height:16px;border:2px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;"></div>
-                        <p id="progressText" style="font-size:13px;color:white;font-weight:500;">Processing...</p>
+
+            <!-- BUTTON (SMALL + CLEAN) -->
+            <button id="uploadBtn"
+                onclick="uploadFile()"
+                disabled
+                class="btn-primary"
+                style="
+                    width:100%;
+                    margin-top:10px;
+                    padding:9px;
+                    font-size:13px;
+                    border-radius:9px;
+                ">
+                Upload & Process
+            </button>
+
+            <!-- PROGRESS (ALWAYS JUST BELOW BUTTON) -->
+            <div id="uploadProgress"
+                style="display:none;margin-top:10px;"
+                class="card-sm">
+
+                <div style="padding:12px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                        <div style="width:14px;height:14px;border:2px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                        <p id="progressText" style="font-size:12px;color:white;">Processing...</p>
                     </div>
-                    <div style="background:rgba(255,255,255,0.07);border-radius:6px;height:6px;overflow:hidden;">
-                        <div id="progressBar" style="height:100%;background:linear-gradient(90deg,#7C3AED,#06B6D4);border-radius:6px;width:0%;transition:width 0.5s;"></div>
+
+                    <div style="background:rgba(255,255,255,0.07);border-radius:6px;height:5px;">
+                        <div id="progressBar"
+                             style="height:100%;background:linear-gradient(90deg,#7C3AED,#06B6D4);border-radius:6px;width:0%;">
+                        </div>
                     </div>
                 </div>
             </div>
-            <div id="uploadResult" style="display:none;margin-top:12px;"></div>
+
+            <!-- RESULT -->
+            <div id="uploadResult" style="display:none;margin-top:10px;"></div>
+
         </div>
+
+        <!-- RIGHT SIDE -->
         <div>
-            <h3 style="font-size:14px;font-weight:700;color:white;margin-bottom:14px;">Upload History</h3>
+            <h3 style="font-size:14px;font-weight:700;color:white;margin-bottom:12px;">
+                Upload History
+            </h3>
+
             <?php if(empty($uploads)):?>
-            <div class="card" style="padding:32px;text-align:center;"><p style="color:var(--muted);font-size:13px;">No uploads yet</p></div>
-            <?php else:?>
-            <div class="card" style="overflow:hidden;">
-                <?php foreach($uploads as $up):?>
-                <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-                    <div>
-                        <p style="font-size:13px;font-weight:600;color:white;"><?php echo htmlspecialchars($up['filename']); ?></p>
-                        <p style="font-size:11.5px;color:var(--muted);margin-top:2px;"><?php echo $up['qa_count']; ?> Q&As · <?php echo $up['file_size_kb']; ?>KB · <?php echo date('d M Y',strtotime($up['created_at'])); ?></p>
-                    </div>
-                    <span class="tag" style="<?php echo $up['status']==='done'?'background:rgba(16,185,129,0.1);color:#6EE7B7;':'background:rgba(245,158,11,0.1);color:#FCD34D;'; ?>"><?php echo ucfirst($up['status']); ?></span>
+                <div class="card" style="padding:24px;text-align:center;">
+                    <p style="color:var(--muted);font-size:13px;">No uploads yet</p>
                 </div>
-                <?php endforeach;?>
-            </div>
+            <?php else:?>
+                <div class="card" style="overflow:hidden;">
+                    <?php foreach($uploads as $up):?>
+                    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                        <div>
+                            <p style="font-size:13px;font-weight:600;color:white;">
+                                <?php echo htmlspecialchars($up['filename']); ?>
+                            </p>
+                            <p style="font-size:11px;color:var(--muted);margin-top:2px;">
+                                <?php echo $up['qa_count']; ?> Q&As · <?php echo $up['file_size_kb']; ?>KB
+                            </p>
+                        </div>
+                        <span class="tag"
+                            style="<?php echo $up['status']==='done'
+                                ?'background:rgba(16,185,129,0.1);color:#6EE7B7;'
+                                :'background:rgba(245,158,11,0.1);color:#FCD34D;'; ?>">
+                            <?php echo ucfirst($up['status']); ?>
+                        </span>
+                    </div>
+                    <?php endforeach;?>
+                </div>
             <?php endif;?>
         </div>
+
     </div>
 </section>
-
 <!-- CONVERSATIONS -->
 <section id="conversations-section" style="display:none;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
@@ -450,45 +511,76 @@ body { background:var(--bg); color:var(--text); }
         </div>
     </div>
 </section>
-
 <!-- TEST -->
-<section id="test-section" style="display:none;">
+<section id="test-section" style="display:none;padding-top:10px;">
     <h1 style="font-size:22px;font-weight:800;color:white;margin-bottom:6px;">Test Chatbot Live</h1>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">Preview how your chatbot responds.</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Preview how your chatbot responds.</p>
+
     <?php if(!$has_data||empty($site_id)):?>
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;text-align:center;">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;text-align:center;">
         <button onclick="showSection('upload')" class="btn-primary">📂 Upload Data First</button>
     </div>
     <?php else:?>
-    <div style="display:grid;grid-template-columns:1fr 400px;gap:24px;align-items:start;">
-        <div class="card" style="padding:20px;">
-            <p style="font-size:13px;font-weight:700;color:white;margin-bottom:8px;">Site ID</p>
-            <code style="font-size:13px;color:#A78BFA;background:rgba(124,58,237,0.1);padding:8px 14px;border-radius:8px;display:block;"><?php echo htmlspecialchars($site_id); ?></code>
-            <p style="font-size:12px;color:var(--muted);margin-top:8px;">Collection: <code style="color:#67E8F9;">chatbot_<?php echo htmlspecialchars($site_id); ?></code></p>
-        </div>
-        <div style="height:580px;border-radius:14px;border:1px solid var(--border);overflow:hidden;">
-            <iframe src="https://bitchatbot.io/chat?site=<?php echo urlencode($site_id); ?>" style="width:100%;height:100%;border:none;" title="Live Chatbot Test"></iframe>
-        </div>
+
+    <!-- Chatbot FIXED TOP RIGHT -->
+    <div id="test-chat-frame" style="
+        position:fixed;
+        top:90px; /* header ke neeche */
+        right:24px;
+        width:340px;
+        height:460px;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 8px 32px rgba(108,60,225,0.3);
+        border:1px solid rgba(108,60,225,0.25);
+        z-index:9999;
+    ">
+        <iframe
+            src="https://bitchatbot.io/chat?site=<?php echo urlencode($site_id); ?>"
+            style="width:100%;height:100%;border:none;display:block;"
+            title="Chatbot Preview">
+        </iframe>
     </div>
+
     <?php endif;?>
 </section>
-
 <!-- EMBED -->
 <section id="embed-section" style="display:none;">
     <h1 style="font-size:22px;font-weight:800;color:white;margin-bottom:6px;">Embed Code</h1>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:24px;">Add before <code style="color:#A78BFA;">&lt;/body&gt;</code> on your website.</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">
+        Add before <code style="color:#A78BFA;">&lt;/body&gt;</code> on your website.
+    </p>
+
     <div style="max-width:700px;">
-        <div style="background:#0D0D14;border:1px solid var(--border);border-radius:14px;padding:20px;position:relative;margin-bottom:16px;">
-            <pre id="embedCode" style="color:#34D399;font-size:13px;overflow-x:auto;white-space:pre-wrap;font-family:monospace;">&lt;script src="https://bitchatbot.io/widget.js" data-site-id="<?php echo htmlspecialchars($site_id); ?>"&gt;&lt;/script&gt;</pre>
-            <button onclick="copyEmbed()" id="copyBtn" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.07);border:1px solid var(--border);color:#D1D5DB;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Copy</button>
-        </div>
-        <div class="card" style="padding:18px;">
-            <p style="font-size:12.5px;font-weight:700;color:white;margin-bottom:10px;">Your Details</p>
-            <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
-                <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Site ID</span><code style="color:#A78BFA;"><?php echo htmlspecialchars($site_id); ?></code></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Collection</span><code style="color:#67E8F9;">chatbot_<?php echo htmlspecialchars($site_id); ?></code></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Plan</span><span class="tag plan-<?php echo $plan; ?>"><?php echo strtoupper($plan); ?></span></div>
-            </div>
+        <div style="
+            background:#0D0D14;
+            border:1px solid var(--border);
+            border-radius:14px;
+            padding:18px;
+            position:relative;
+        ">
+            <pre id="embedCode" style="
+                color:#34D399;
+                font-size:13px;
+                overflow-x:auto;
+                white-space:pre-wrap;
+                font-family:monospace;
+                margin:0;
+            ">&lt;script src="https://bitchatbot.io/widget.js" data-site-id="<?php echo htmlspecialchars($site_id); ?>"&gt;&lt;/script&gt;</pre>
+
+            <button onclick="copyEmbed()" id="copyBtn" style="
+                position:absolute;
+                top:12px;
+                right:12px;
+                background:rgba(255,255,255,0.07);
+                border:1px solid var(--border);
+                color:#D1D5DB;
+                padding:6px 14px;
+                border-radius:8px;
+                font-size:12px;
+                font-weight:600;
+                cursor:pointer;
+            ">Copy</button>
         </div>
     </div>
 </section>
@@ -497,14 +589,12 @@ body { background:var(--bg); color:var(--text); }
 <section id="settings-section" style="display:none;">
     <h1 style="font-size:22px;font-weight:800;color:white;margin-bottom:24px;">Settings</h1>
     <div style="max-width:580px;display:flex;flex-direction:column;gap:20px;">
-
         <!-- Account Info -->
         <div class="card" style="padding:20px;">
             <h3 style="font-size:14px;font-weight:700;color:white;margin-bottom:14px;">Account Info</h3>
             <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Username</span><span style="color:white;font-weight:500;"><?php echo htmlspecialchars($username); ?></span></div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Email</span><span style="color:white;"><?php echo htmlspecialchars($email); ?></span></div>
-                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Site ID</span><code style="color:#A78BFA;"><?php echo htmlspecialchars($site_id ?: '—'); ?></code></div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:var(--muted);">Status</span><span style="color:#6EE7B7;font-weight:600;">✓ Approved</span></div>
             </div>
         </div>
@@ -596,35 +686,7 @@ body { background:var(--bg); color:var(--text); }
             </div>
             <?php endif; ?>
         </div>
-        <!-- ════════════════════════════════════════════ -->
-
-        <!-- Website URL -->
-        <div class="card" style="padding:20px;">
-            <h3 style="font-size:14px;font-weight:700;color:white;margin-bottom:14px;">Website URL</h3>
-            <?php if(!empty($website_msg)):?>
-            <div style="background:<?php echo $website_msg['type']==='success'?'rgba(16,185,129,0.1)':'rgba(239,68,68,0.1)';?>;border:1px solid <?php echo $website_msg['type']==='success'?'rgba(16,185,129,0.2)':'rgba(239,68,68,0.2)';?>;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:<?php echo $website_msg['type']==='success'?'#6EE7B7':'#FCA5A5';?>;"><?php echo htmlspecialchars($website_msg['text']); ?></div>
-            <?php endif;?>
-            <form method="POST" style="display:flex;gap:10px;">
-                <input type="hidden" name="save_website" value="1">
-                <input type="url" name="website_url" class="inp" placeholder="https://yourwebsite.com" value="<?php echo htmlspecialchars($website_url); ?>" style="flex:1;">
-                <button type="submit" class="btn-primary">Save</button>
-            </form>
-        </div>
-
-        <!-- Coupon -->
-        <div class="card" style="padding:20px;">
-            <h3 style="font-size:14px;font-weight:700;color:white;margin-bottom:14px;">Apply Coupon Code</h3>
-            <?php if(!empty($coupon_msg)):?>
-            <div style="background:<?php echo $coupon_msg['type']==='success'?'rgba(16,185,129,0.1)':'rgba(239,68,68,0.1)';?>;border:1px solid <?php echo $coupon_msg['type']==='success'?'rgba(16,185,129,0.2)':'rgba(239,68,68,0.2)';?>;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:<?php echo $coupon_msg['type']==='success'?'#6EE7B7':'#FCA5A5';?>;"><?php echo htmlspecialchars($coupon_msg['text']); ?></div>
-            <?php endif;?>
-            <form method="POST" style="display:flex;gap:10px;">
-                <input type="hidden" name="apply_coupon" value="1">
-                <input type="text" name="coupon_code" class="inp" placeholder="Enter coupon code" style="flex:1;font-family:monospace;letter-spacing:0.08em;">
-                <button type="submit" class="btn-primary">Apply</button>
-            </form>
-        </div>
-
-    </div>
+        </div> 
 </section>
 
 </main>
@@ -686,7 +748,7 @@ function setFile(f){
     if(f.size>limit){alert('File too large! Max <?php echo $upload_limit;?>MB');return;}
     selectedFile=f;
     const el=document.getElementById('selectedFile');
-    el.innerHTML='📄 '+f.name+' <span style="color:#67E8F9;font-size:11px;">→ Site ID: <b>'+generateSiteId(f.name)+'</b></span>';
+    el.innerHTML='📄 '+f.name+' <span style="color:#67E8F9;font-size:11px;">→ Ready for processing</span>';
     el.style.display='block';
     document.getElementById('uploadBtn').disabled=false;
 }
