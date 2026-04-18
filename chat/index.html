@@ -52,6 +52,7 @@ body {
   justify-content:space-between;
   flex-shrink:0;
   width:100%;
+  transition:background 0.3s;
 }
 .bc-header-left { display:flex; align-items:center; gap:10px; }
 .bc-header-avatar {
@@ -172,6 +173,7 @@ body {
   border:none;
   border-bottom-left-radius:14px;
   border-bottom-right-radius:3px;
+  transition:background 0.3s;
 }
 
 .bc-time {
@@ -338,7 +340,7 @@ body {
   </div>
 
   <!-- FOOTER -->
-  <div class="bc-footer-bar">Powered by <strong>Bitchat</strong></div>
+  <div class="bc-footer-bar">Powered by <strong>bitchat.io</strong></div>
 
 </div>
 
@@ -406,6 +408,39 @@ const BOT_AV = `<div class="bc-msg-av">
   </svg>
 </div>`;
 
+// ──────────────────────────────────────────────
+// Settings fetch function — DB se name & color lata hai
+// ──────────────────────────────────────────────
+async function bcLoadSettings(siteId) {
+  try {
+    const res = await fetch(
+      'https://bitchatbot.io/get_chatbot_settings.php?site=' + encodeURIComponent(siteId)
+    );
+    const s = await res.json();
+
+    const name  = (s.chatbot_name  && s.chatbot_name.trim())  ? s.chatbot_name  : 'Bitchat Assistant';
+    const color = (s.primary_color && s.primary_color.trim()) ? s.primary_color : '#6C3CE1';
+
+    // Header name update
+    document.querySelector('.bc-header-name').textContent = name;
+    document.title = name;
+
+    // CSS variables update — isse suggestion hover, typing dots, send btn sab update ho jaenge
+    const root = document.documentElement;
+    root.style.setProperty('--bc-purple',      color);
+    root.style.setProperty('--bc-purple-dark', color);
+
+    // Header background directly
+    document.querySelector('.bc-header').style.background = color;
+
+  } catch(e) {
+    // Koi error ho to default rehne do — koi problem nahi
+  }
+}
+
+// ──────────────────────────────────────────────
+// DOMContentLoaded — siteId set hone ke baad settings load
+// ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', function () {
   const siteId = bcGetSiteId();
   if (!siteId) {
@@ -413,9 +448,13 @@ window.addEventListener('DOMContentLoaded', function () {
       '<div style="padding:20px;text-align:center;color:#e53e3e;font-size:13px;">⚠️ No site ID provided.</div>';
     return;
   }
+
   BC.siteId    = siteId;
   BC.sessionId = bcGetOrCreateSession(siteId);
   BC.messages  = [{ role:'bot', text:'Hi! How can I assist you today?', time:'Just now' }];
+
+  // ← Yahan settings fetch hoti hain — siteId set hone ke turant baad
+  bcLoadSettings(siteId);
 
   const pills = bcGetSuggestions(siteId);
   const cont  = document.getElementById('bc-suggestion-pills');

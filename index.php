@@ -599,9 +599,35 @@
   }
 }
 </style>
-
 <script>
 var bcOpen = false;
+var BC_SITE_ID = '<?php echo addslashes($site_id); ?>';  // PHP se site_id milti hai
+
+// ── DB se settings fetch — toggle naam + color apply karo ──
+(function bcLoadWidgetSettings() {
+  if (!BC_SITE_ID) return;
+
+  fetch('https://bitchatbot.io/get_chatbot_settings.php?site=' + encodeURIComponent(BC_SITE_ID))
+    .then(function(res) { return res.json(); })
+    .then(function(s) {
+      var name  = (s.chatbot_name  && s.chatbot_name.trim())  ? s.chatbot_name  : 'Bitchat';
+      var color = (s.primary_color && s.primary_color.trim()) ? s.primary_color : '#6C3CE1';
+
+      // Toggle button label (naam) update
+      var label = document.getElementById('bc-btn-label');
+      if (label) label.textContent = name;
+
+      // Toggle button background color update
+      var btn = document.getElementById('bc-toggle-btn');
+      if (btn) {
+        btn.style.background = color;
+        btn.style.boxShadow  = '0 6px 24px ' + color + '55';
+      }
+    })
+    .catch(function(err) {
+      console.warn('[BitChat] Widget settings fetch failed:', err);
+    });
+})();
 
 function bcWidgetToggle() {
   bcOpen = !bcOpen;
@@ -613,29 +639,36 @@ function bcWidgetToggle() {
   var btn      = document.getElementById('bc-toggle-btn');
 
   if (bcOpen) {
-    // Open chatbot
+    // Chat kholo
     wrap.style.display = 'block';
     setTimeout(function () {
       wrap.style.transform = 'scale(1) translateY(0)';
       wrap.style.opacity   = '1';
     }, 10);
-    // Switch to X icon, hide label
+
+    // X icon + circle button
     chatIco.style.display  = 'none';
     closeIco.style.display = 'block';
     label.style.display    = 'none';
     btn.style.padding      = '0 13px';
+    btn.style.borderRadius = '50%';
+    btn.style.width        = '50px';
+    btn.style.gap          = '0';
+
   } else {
-    // Close chatbot
+    // Chat band karo
     wrap.style.transform = 'scale(0.88) translateY(12px)';
     wrap.style.opacity   = '0';
-    setTimeout(function () {
-      wrap.style.display = 'none';
-    }, 320);
-    // Switch back to chat icon, show label
+    setTimeout(function () { wrap.style.display = 'none'; }, 320);
+
+    // Normal button wapas
     chatIco.style.display  = 'block';
     closeIco.style.display = 'none';
     label.style.display    = 'inline';
     btn.style.padding      = '0 18px 0 13px';
+    btn.style.borderRadius = '50px';
+    btn.style.width        = 'auto';
+    btn.style.gap          = '9px';
   }
 }
 

@@ -28,31 +28,29 @@ if (empty($current_plan) || $current_plan === 'none') {
     header('Location: select_plan.php'); exit();
 }
 
-if ($_SESSION['status'] !== 'approved') { ?>
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Awaiting Approval — Bitchat</title>
+// ── Auto-approve: if pending, approve automatically ──
+if ($_SESSION['status'] === 'pending') {
+    $conn->prepare("UPDATE users SET status='approved' WHERE id=?")->execute([$_SESSION['user_id']]);
+    // Use bind_param properly
+    $auto_upd = $conn->prepare("UPDATE users SET status='approved' WHERE id=?");
+    $auto_upd->bind_param("i", $_SESSION['user_id']); $auto_upd->execute(); $auto_upd->close();
+    $_SESSION['status'] = 'approved';
+}
+
+// ── BANNED check — show ban screen ──
+if ($_SESSION['status'] === 'banned') { ?>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Account Banned — Bitchat</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script></head>
 <body class="bg-slate-950 min-h-screen flex items-center justify-center" style="font-family:'Plus Jakarta Sans',sans-serif">
 <div class="text-center max-w-md mx-auto px-6">
-    <div class="w-20 h-20 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
-        <svg class="w-10 h-10 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <div class="w-20 h-20 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
     </div>
-    <h1 class="text-2xl font-bold text-white mb-3">Awaiting Approval</h1>
-    <p class="text-slate-400 mb-2">Your account <strong class="text-white"><?php echo htmlspecialchars($_SESSION['username']); ?></strong> is under review..</p>
-    <p class="text-sm text-slate-500 mb-4">You will get full access after admin approval.</p>
-    <!-- Show selected plan while waiting -->
-    <div class="bg-indigo-500/10 border border-indigo-500/20 rounded-xl px-5 py-4 mb-8 text-sm text-indigo-300">
-        Selected plan: <strong class="text-white"><?php echo strtoupper($current_plan); ?></strong>
-        <?php
-        $plan_prices = ['basic'=>'$10','starter'=>'$20','pro'=>'$30'];
-        $pp = $plan_prices[$current_plan] ?? '';
-        if($pp) echo ' · <span class="text-indigo-400">'.$pp.'/mo</span>';
-        ?>
-    </div>
-    <div class="flex gap-3 justify-center">
-        <button onclick="location.reload()" class="bg-violet-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-violet-500 transition">Check Status</button>
-        <a href="logout.php" class="bg-slate-800 text-slate-300 px-6 py-2.5 rounded-xl font-medium hover:bg-slate-700 transition">Logout</a>
-    </div>
+    <h1 class="text-2xl font-bold text-white mb-3">Account Banned</h1>
+    <p class="text-slate-400 mb-2">Your account <strong class="text-white"><?php echo htmlspecialchars($_SESSION['username']); ?></strong> has been banned.</p>
+    <p class="text-sm text-slate-500 mb-8">If you think this is a mistake, please contact support.</p>
+    <a href="logout.php" class="bg-slate-800 text-slate-300 px-6 py-2.5 rounded-xl font-medium hover:bg-slate-700 transition inline-block">Logout</a>
 </div></body></html>
 <?php exit(); }
 
@@ -160,6 +158,17 @@ if (empty($site_id) && !empty($upload_site_id)) {
 }
 
 $recent_chats = array_slice(array_reverse($chats), 0, 5);
+
+// Fetch customization settings
+$customData = ['chatbot_name' => 'Bitchat Assistant', 'primary_color' => '#6C3CE1'];
+if ($plan_has_cust) {
+    $cstmt = $conn->prepare("SELECT chatbot_name, primary_color FROM chatbot_settings WHERE user_id = ?");
+    if ($cstmt) {
+        $cstmt->bind_param("i", $user_id); $cstmt->execute();
+        $crow = $cstmt->get_result()->fetch_assoc(); $cstmt->close();
+        if ($crow) $customData = array_merge($customData, $crow);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -177,7 +186,7 @@ $recent_chats = array_slice(array_reverse($chats), 0, 5);
   --border:rgba(255,255,255,0.07); --text:#F1F1F5; --muted:#6B7280;
 }
 body { background:var(--bg); color:var(--text); }
-.nav-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:500; color:#9CA3AF; transition:all 0.18s; border:none; background:none; width:100%; text-align:left; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:500; color:#9CA3AF; transition:all 0.18s; border:none; background:none; width:100%; text-align:left; text-decoration:none; }
 .nav-item:hover { background:rgba(255,255,255,0.05); color:white; }
 .nav-item.active { background:rgba(124,58,237,0.18); color:#A78BFA; border:1px solid rgba(124,58,237,0.3); }
 .nav-item .icon { width:16px; height:16px; flex-shrink:0; }
@@ -225,7 +234,6 @@ body { background:var(--bg); color:var(--text); }
         </div>
         <span style="font-weight:700;font-size:15px;color:white;">Bitchat</span>
     </div>
-    <!-- Plan badge in nav -->
     <span class="tag plan-<?php echo $plan; ?>"><?php echo ($plan_emoji[$plan]??'').' '.strtoupper($plan); ?></span>
     <?php if ($coupon_active): ?>
     <span style="font-size:11px;color:#6EE7B7;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);padding:3px 10px;border-radius:20px;">🎟️ <?php echo $coupon_days_left; ?>d left</span>
@@ -233,7 +241,7 @@ body { background:var(--bg); color:var(--text); }
     <div style="display:flex;align-items:center;gap:10px;">
         <div style="text-align:right;" class="hidden md:block">
             <p style="font-size:13px;font-weight:600;color:white;"><?php echo htmlspecialchars($username); ?></p>
-<p style="font-size:11px;color:var(--muted);">Chatbot Connected</p>
+            <p style="font-size:11px;color:var(--muted);">Chatbot Connected</p>
         </div>
         <a href="logout.php" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#F87171;padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:600;text-decoration:none;">Logout</a>
     </div>
@@ -279,12 +287,24 @@ body { background:var(--bg); color:var(--text); }
             <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
             Embed Code
         </button>
+        <?php if($plan_has_cust): ?>
+        <a href="chatbot_customize.php" class="nav-item" style="text-decoration:none;">
+            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+            Customize Chatbot
+            <span style="margin-left:auto;background:linear-gradient(90deg,rgba(124,58,237,0.4),rgba(6,182,212,0.3));color:#A78BFA;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;">NEW</span>
+        </a>
+        <?php else: ?>
+        <a href="select_plan.php?upgrade=1" class="nav-item" style="text-decoration:none;opacity:0.55;">
+            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+            Customize Chatbot
+            <span style="margin-left:auto;font-size:9px;background:rgba(245,158,11,0.15);color:#FCD34D;padding:2px 7px;border-radius:8px;font-weight:700;">🔒 PRO</span>
+        </a>
+        <?php endif; ?>
         <button onclick="showSection('settings')" id="nav-settings" class="nav-item">
             <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             Settings
         </button>
     </div>
-    <!-- Upgrade nudge for basic users -->
     <?php if($plan==='basic'):?>
     <div style="margin-top:20px;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(6,182,212,0.1));border:1px solid rgba(124,58,237,0.25);border-radius:12px;padding:14px;text-align:center;">
         <p style="font-size:12px;font-weight:700;color:#A78BFA;margin-bottom:4px;">🚀 Upgrade to Starter</p>
@@ -357,116 +377,51 @@ body { background:var(--bg); color:var(--text); }
 <!-- UPLOAD -->
 <section id="upload-section" style="display:none;">
     <h1 style="font-size:22px;font-weight:800;color:white;margin-bottom:6px;">Upload Chatbot Data</h1>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">
-        Supported: DOCX, PDF · Limit: <strong style="color:#A78BFA;"><?php echo $upload_limit; ?>MB</strong>
-    </p>
-
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">Supported: DOCX, PDF · Limit: <strong style="color:#A78BFA;"><?php echo $upload_limit; ?>MB</strong></p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:flex-start;">
-
-        <!-- LEFT SIDE -->
         <div style="max-width:420px;">
-
-            <!-- DROP ZONE -->
-            <div class="drop-zone" id="dropZone"
-                onclick="document.getElementById('fileInput').click()"
-                ondragover="event.preventDefault();this.classList.add('drag-over')"
-                ondragleave="this.classList.remove('drag-over')"
-                ondrop="handleDrop(event)"
-                style="padding:36px;">
-
-                <svg class="w-8 h-8 mx-auto mb-2" style="color:#7C3AED;opacity:0.7;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                </svg>
-
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event)" style="padding:36px;">
+                <svg class="w-8 h-8 mx-auto mb-2" style="color:#7C3AED;opacity:0.7;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                 <p style="color:white;font-weight:600;font-size:13px;">Drop file or click</p>
-                <p style="color:var(--muted);font-size:11px;margin-top:3px;">
-                    JSON, DOCX, PDF · Max <?php echo $upload_limit; ?>MB
-                </p>
-
-                <p id="selectedFile"
-                   style="margin-top:8px;color:#A78BFA;font-size:12px;font-weight:600;display:none;">
-                </p>
-
-                <input type="file" id="fileInput" accept=".json,.docx,.pdf"
-                       style="display:none;" onchange="handleFileSelect(this)">
+                <p style="color:var(--muted);font-size:11px;margin-top:3px;">DOCX, PDF · Max <?php echo $upload_limit; ?>MB</p>
+                <p id="selectedFile" style="margin-top:8px;color:#A78BFA;font-size:12px;font-weight:600;display:none;"></p>
+             <input type="file" id="fileInput" accept=".json,.docx,.pdf" style="display:none;" onchange="handleFileSelect(this)">
             </div>
-
-            <!-- BUTTON (SMALL + CLEAN) -->
-            <button id="uploadBtn"
-                onclick="uploadFile()"
-                disabled
-                class="btn-primary"
-                style="
-                    width:100%;
-                    margin-top:10px;
-                    padding:9px;
-                    font-size:13px;
-                    border-radius:9px;
-                ">
-                Upload & Process
-            </button>
-
-            <!-- PROGRESS (ALWAYS JUST BELOW BUTTON) -->
-            <div id="uploadProgress"
-                style="display:none;margin-top:10px;"
-                class="card-sm">
-
+            <button id="uploadBtn" onclick="uploadFile()" disabled class="btn-primary" style="width:100%;margin-top:10px;padding:9px;font-size:13px;border-radius:9px;">Upload & Process</button>
+            <div id="uploadProgress" style="display:none;margin-top:10px;" class="card-sm">
                 <div style="padding:12px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                         <div style="width:14px;height:14px;border:2px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
                         <p id="progressText" style="font-size:12px;color:white;">Processing...</p>
                     </div>
-
                     <div style="background:rgba(255,255,255,0.07);border-radius:6px;height:5px;">
-                        <div id="progressBar"
-                             style="height:100%;background:linear-gradient(90deg,#7C3AED,#06B6D4);border-radius:6px;width:0%;">
-                        </div>
+                        <div id="progressBar" style="height:100%;background:linear-gradient(90deg,#7C3AED,#06B6D4);border-radius:6px;width:0%;"></div>
                     </div>
                 </div>
             </div>
-
-            <!-- RESULT -->
             <div id="uploadResult" style="display:none;margin-top:10px;"></div>
-
         </div>
-
-        <!-- RIGHT SIDE -->
         <div>
-            <h3 style="font-size:14px;font-weight:700;color:white;margin-bottom:12px;">
-                Upload History
-            </h3>
-
+            <h3 style="font-size:14px;font-weight:700;color:white;margin-bottom:12px;">Upload History</h3>
             <?php if(empty($uploads)):?>
-                <div class="card" style="padding:24px;text-align:center;">
-                    <p style="color:var(--muted);font-size:13px;">No uploads yet</p>
-                </div>
+            <div class="card" style="padding:24px;text-align:center;"><p style="color:var(--muted);font-size:13px;">No uploads yet</p></div>
             <?php else:?>
-                <div class="card" style="overflow:hidden;">
-                    <?php foreach($uploads as $up):?>
-                    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
-                        <div>
-                            <p style="font-size:13px;font-weight:600;color:white;">
-                                <?php echo htmlspecialchars($up['filename']); ?>
-                            </p>
-                            <p style="font-size:11px;color:var(--muted);margin-top:2px;">
-                                <?php echo $up['qa_count']; ?> Q&As · <?php echo $up['file_size_kb']; ?>KB
-                            </p>
-                        </div>
-                        <span class="tag"
-                            style="<?php echo $up['status']==='done'
-                                ?'background:rgba(16,185,129,0.1);color:#6EE7B7;'
-                                :'background:rgba(245,158,11,0.1);color:#FCD34D;'; ?>">
-                            <?php echo ucfirst($up['status']); ?>
-                        </span>
+            <div class="card" style="overflow:hidden;">
+                <?php foreach($uploads as $up):?>
+                <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+                    <div>
+                        <p style="font-size:13px;font-weight:600;color:white;"><?php echo htmlspecialchars($up['filename']); ?></p>
+                        <p style="font-size:11px;color:var(--muted);margin-top:2px;"><?php echo $up['qa_count']; ?> Q&As · <?php echo $up['file_size_kb']; ?>KB</p>
                     </div>
-                    <?php endforeach;?>
+                    <span class="tag" style="<?php echo $up['status']==='done'?'background:rgba(16,185,129,0.1);color:#6EE7B7;':'background:rgba(245,158,11,0.1);color:#FCD34D;'; ?>"><?php echo ucfirst($up['status']); ?></span>
                 </div>
+                <?php endforeach;?>
+            </div>
             <?php endif;?>
         </div>
-
     </div>
 </section>
+
 <!-- CONVERSATIONS -->
 <section id="conversations-section" style="display:none;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
@@ -511,76 +466,30 @@ body { background:var(--bg); color:var(--text); }
         </div>
     </div>
 </section>
+
 <!-- TEST -->
 <section id="test-section" style="display:none;padding-top:10px;">
     <h1 style="font-size:22px;font-weight:800;color:white;margin-bottom:6px;">Test Chatbot Live</h1>
     <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Preview how your chatbot responds.</p>
-
     <?php if(!$has_data||empty($site_id)):?>
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;text-align:center;">
         <button onclick="showSection('upload')" class="btn-primary">📂 Upload Data First</button>
     </div>
     <?php else:?>
-
-    <!-- Chatbot FIXED TOP RIGHT -->
-    <div id="test-chat-frame" style="
-        position:fixed;
-        top:90px; /* header ke neeche */
-        right:24px;
-        width:340px;
-        height:460px;
-        border-radius:16px;
-        overflow:hidden;
-        box-shadow:0 8px 32px rgba(108,60,225,0.3);
-        border:1px solid rgba(108,60,225,0.25);
-        z-index:9999;
-    ">
-        <iframe
-            src="https://bitchatbot.io/chat?site=<?php echo urlencode($site_id); ?>"
-            style="width:100%;height:100%;border:none;display:block;"
-            title="Chatbot Preview">
-        </iframe>
+    <div id="test-chat-frame" style="position:fixed;top:90px;right:24px;width:340px;height:460px;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(108,60,225,0.3);border:1px solid rgba(108,60,225,0.25);z-index:9999;">
+        <iframe src="https://bitchatbot.io/chat?site=<?php echo urlencode($site_id); ?>" style="width:100%;height:100%;border:none;display:block;" title="Chatbot Preview"></iframe>
     </div>
-
     <?php endif;?>
 </section>
+
 <!-- EMBED -->
 <section id="embed-section" style="display:none;">
     <h1 style="font-size:22px;font-weight:800;color:white;margin-bottom:6px;">Embed Code</h1>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">
-        Add before <code style="color:#A78BFA;">&lt;/body&gt;</code> on your website.
-    </p>
-
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">Add before <code style="color:#A78BFA;">&lt;/body&gt;</code> on your website.</p>
     <div style="max-width:700px;">
-        <div style="
-            background:#0D0D14;
-            border:1px solid var(--border);
-            border-radius:14px;
-            padding:18px;
-            position:relative;
-        ">
-            <pre id="embedCode" style="
-                color:#34D399;
-                font-size:13px;
-                overflow-x:auto;
-                white-space:pre-wrap;
-                font-family:monospace;
-                margin:0;
-            ">&lt;script src="https://bitchatbot.io/widget.js" data-site-id="<?php echo htmlspecialchars($site_id); ?>"&gt;&lt;/script&gt;</pre>
-
-            <button onclick="copyEmbed()" id="copyBtn" style="
-                position:absolute;
-                top:12px;
-                right:12px;
-                background:rgba(255,255,255,0.07);
-                border:1px solid var(--border);
-                color:#D1D5DB;
-                padding:6px 14px;
-                border-radius:8px;
-                font-size:12px;
-                font-weight:600;
-                cursor:pointer;
-            ">Copy</button>
+        <div style="background:#0D0D14;border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;">
+            <pre id="embedCode" style="color:#34D399;font-size:13px;overflow-x:auto;white-space:pre-wrap;font-family:monospace;margin:0;">&lt;script src="https://bitchatbot.io/widget.js" data-site-id="<?php echo htmlspecialchars($site_id); ?>"&gt;&lt;/script&gt;</pre>
+            <button onclick="copyEmbed()" id="copyBtn" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.07);border:1px solid var(--border);color:#D1D5DB;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Copy</button>
         </div>
     </div>
 </section>
@@ -589,104 +498,95 @@ body { background:var(--bg); color:var(--text); }
 <section id="settings-section" style="display:none;">
     <h1 style="font-size:22px;font-weight:800;color:white;margin-bottom:24px;">Settings</h1>
     <div style="max-width:580px;display:flex;flex-direction:column;gap:20px;">
-        <!-- Account Info -->
         <div class="card" style="padding:20px;">
             <h3 style="font-size:14px;font-weight:700;color:white;margin-bottom:14px;">Account Info</h3>
             <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Username</span><span style="color:white;font-weight:500;"><?php echo htmlspecialchars($username); ?></span></div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">Email</span><span style="color:white;"><?php echo htmlspecialchars($email); ?></span></div>
-                <div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:var(--muted);">Status</span><span style="color:#6EE7B7;font-weight:600;">✓ Approved</span></div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:var(--muted);">Status</span><span style="color:#6EE7B7;font-weight:600;">✓ Active</span></div>
             </div>
         </div>
 
-        <!-- ════════════════════════════════════════════
-             PLAN INFO CARD — shows current plan details
-             ════════════════════════════════════════════ -->
-        <div class="card" style="padding:20px;position:relative;overflow:hidden;">
-            <!-- Top gradient bar based on plan -->
-            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:<?php
-                echo $plan==='pro'     ? 'linear-gradient(90deg,#06B6D4,#4F46E5)' :
-                    ($plan==='starter'  ? 'linear-gradient(90deg,#4F46E5,#8B5CF6)' :
-                                          'linear-gradient(90deg,#10B981,#3B82F6)');
-            ?>;"></div>
+        <!-- Customization Card -->
+        <div class="card" style="padding:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <h3 style="font-size:14px;font-weight:700;color:white;">Chatbot Customization</h3>
+                <?php if($plan_has_cust): ?>
+                <a href="chatbot_customize.php" style="font-size:12px;color:#A78BFA;font-weight:600;text-decoration:none;background:rgba(124,58,237,0.12);padding:5px 12px;border-radius:8px;border:1px solid rgba(124,58,237,0.2);">Open Editor →</a>
+                <?php else: ?>
+                <a href="select_plan.php?upgrade=1" style="font-size:12px;color:#FCD34D;font-weight:600;text-decoration:none;background:rgba(245,158,11,0.08);padding:5px 12px;border-radius:8px;border:1px solid rgba(245,158,11,0.2);">🔒 Upgrade</a>
+                <?php endif; ?>
+            </div>
+            <?php if($plan_has_cust): ?>
+            <div style="display:flex;align-items:center;gap:14px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;">
+                <div style="width:48px;height:48px;border-radius:12px;background:<?php echo htmlspecialchars($customData['primary_color']); ?>;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="14" rx="4" stroke="rgba(255,255,255,0.8)" stroke-width="1.8"/><circle cx="9" cy="13" r="1.5" fill="rgba(255,255,255,0.8)"/><circle cx="15" cy="13" r="1.5" fill="rgba(255,255,255,0.8)"/></svg>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <p style="font-size:13.5px;font-weight:600;color:white;"><?php echo htmlspecialchars($customData['chatbot_name']); ?></p>
+                    <p style="font-size:11.5px;color:var(--muted);margin-top:2px;">Color: <code style="color:#A78BFA;"><?php echo strtoupper(htmlspecialchars($customData['primary_color'])); ?></code></p>
+                </div>
+                <a href="chatbot_customize.php" style="background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.25);color:#A78BFA;padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:600;text-decoration:none;flex-shrink:0;">✏️ Edit</a>
+            </div>
+            <?php else: ?>
+            <div style="padding:14px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.15);border-radius:12px;text-align:center;">
+                <p style="font-size:13px;color:#FCD34D;font-weight:600;margin-bottom:4px;">🔒 Available on Starter & Pro</p>
+                <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Change chatbot name, colors and branding.</p>
+                <a href="select_plan.php?upgrade=1" style="background:#7C3AED;color:white;padding:8px 18px;border-radius:9px;font-size:13px;font-weight:600;text-decoration:none;">Upgrade Plan →</a>
+            </div>
+            <?php endif; ?>
+        </div>
 
+        <!-- Plan Card -->
+        <div class="card" style="padding:20px;position:relative;overflow:hidden;">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:<?php echo $plan==='pro'?'linear-gradient(90deg,#06B6D4,#4F46E5)':($plan==='starter'?'linear-gradient(90deg,#4F46E5,#8B5CF6)':'linear-gradient(90deg,#10B981,#3B82F6)'); ?>;"></div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
                 <h3 style="font-size:14px;font-weight:700;color:white;">Your Plan</h3>
-                <?php if(!in_array($plan,['starter','pro'])): ?>
+                <?php if(!$plan_has_cust): ?>
                 <a href="select_plan.php?upgrade=1" style="font-size:12px;color:#A78BFA;font-weight:600;text-decoration:none;background:rgba(124,58,237,0.12);padding:5px 12px;border-radius:8px;border:1px solid rgba(124,58,237,0.2);">Upgrade →</a>
                 <?php else: ?>
                 <a href="select_plan.php?upgrade=1" style="font-size:12px;color:#6B7280;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.04);padding:5px 12px;border-radius:8px;border:1px solid var(--border);">Manage Plan</a>
                 <?php endif; ?>
             </div>
-
-            <!-- Plan name + emoji + price -->
             <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
-                <div style="width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;background:<?php
-                    echo $plan==='pro'    ? 'linear-gradient(135deg,rgba(6,182,212,0.15),rgba(99,102,241,0.15))' :
-                        ($plan==='starter' ? 'rgba(99,102,241,0.15)' : 'rgba(16,185,129,0.12)');
-                ?>;"><?php echo $plan_emoji[$plan] ?? '📦'; ?></div>
+                <div style="width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;background:<?php echo $plan==='pro'?'linear-gradient(135deg,rgba(6,182,212,0.15),rgba(99,102,241,0.15))':($plan==='starter'?'rgba(99,102,241,0.15)':'rgba(16,185,129,0.12)'); ?>;"><?php echo $plan_emoji[$plan] ?? '📦'; ?></div>
                 <div>
                     <p style="font-size:22px;font-weight:900;color:white;line-height:1;"><?php echo strtoupper($plan); ?></p>
                     <p style="font-size:13px;color:#6B7280;margin-top:3px;">
                         <?php
-                        if ($payment_method === 'coupon') {
-                            echo '<span style="color:#34D399;">FREE via Coupon</span> · 1 Chatbot Agent';
-                        } elseif ($payment_method === 'stripe') {
-                            echo '<span style="color:#a5b4fc;">'.$plan_prices[$plan].'</span> · '.($plan_agents[$plan]??1).' Chatbot Agents · Paid via Stripe';
-                        } else {
-                            echo ($plan_prices[$plan]??'').' · '.($plan_agents[$plan]??1).' Chatbot Agents';
-                        }
+                        if ($payment_method === 'coupon') echo '<span style="color:#34D399;">FREE via Coupon</span> · 1 Chatbot Agent';
+                        elseif ($payment_method === 'stripe') echo '<span style="color:#a5b4fc;">'.$plan_prices[$plan].'</span> · '.($plan_agents[$plan]??1).' Chatbot Agents · Paid via Stripe';
+                        else echo ($plan_prices[$plan]??'').' · '.($plan_agents[$plan]??1).' Chatbot Agents';
                         ?>
                     </p>
                 </div>
             </div>
-
-            <!-- Plan feature grid -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
-                <?php
-                $grid = [
-                    ['Chatbot Agents',  $plan_agents[$plan] ?? 1],
-                    ['Upload Limit',    $upload_limit . ' MB'],
-                    ['Customization',   $plan_has_cust ? '✓ Included' : '✗ Not included'],
-                    ['Support',         $plan==='pro'?'Dedicated':($plan==='starter'?'Priority':'Standard')],
-                ];
-                foreach ($grid as [$lbl,$val]): ?>
+                <?php foreach ([['Chatbot Agents',$plan_agents[$plan]??1],['Upload Limit',$upload_limit.' MB'],['Customization',$plan_has_cust?'✓ Included':'✗ Not included'],['Support',$plan==='pro'?'Dedicated':($plan==='starter'?'Priority':'Standard')]] as [$lbl,$val]): ?>
                 <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
                     <p style="font-size:10.5px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;"><?php echo $lbl; ?></p>
-                    <p style="font-size:14px;font-weight:700;color:<?php
-                        echo (str_contains((string)$val,'✓')) ? '#6EE7B7' :
-                             (str_contains((string)$val,'✗') ? '#4B5563' : 'white');
-                    ?>;"><?php echo $val; ?></p>
+                    <p style="font-size:14px;font-weight:700;color:<?php echo str_contains((string)$val,'✓')?'#6EE7B7':(str_contains((string)$val,'✗')?'#4B5563':'white'); ?>;"><?php echo $val; ?></p>
                 </div>
                 <?php endforeach; ?>
             </div>
-
-            <!-- Payment method banner -->
             <?php if ($payment_method === 'coupon' && $coupon_active): ?>
             <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.18);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
-                <div>
-                    <p style="font-size:13px;font-weight:600;color:#6EE7B7;">🎟️ Coupon Active</p>
-                    <p style="font-size:11.5px;color:#10B981;margin-top:2px;"><?php echo $coupon_days_left; ?> days remaining · Code: <code><?php echo htmlspecialchars($_SESSION['coupon_code']??''); ?></code></p>
-                </div>
+                <div><p style="font-size:13px;font-weight:600;color:#6EE7B7;">🎟️ Coupon Active</p><p style="font-size:11.5px;color:#10B981;margin-top:2px;"><?php echo $coupon_days_left; ?> days remaining · Code: <code><?php echo htmlspecialchars($_SESSION['coupon_code']??''); ?></code></p></div>
                 <span style="font-size:11px;color:#059669;background:rgba(16,185,129,0.1);padding:4px 10px;border-radius:8px;">Exp <?php echo date('d M Y',strtotime($coupon_exp)); ?></span>
             </div>
             <?php elseif ($payment_method === 'stripe'): ?>
             <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;">
                 <span style="font-size:18px;">💳</span>
-                <div>
-                    <p style="font-size:13px;font-weight:600;color:#a5b4fc;">Stripe Subscription Active</p>
-                    <p style="font-size:11.5px;color:#6B7280;margin-top:2px;font-family:monospace;"><?php echo htmlspecialchars(substr($stripe_sub_id,0,30)).'...'; ?></p>
-                </div>
+                <div><p style="font-size:13px;font-weight:600;color:#a5b4fc;">Stripe Subscription Active</p><p style="font-size:11.5px;color:#6B7280;margin-top:2px;font-family:monospace;"><?php echo htmlspecialchars(substr($stripe_sub_id,0,30)).'...'; ?></p></div>
             </div>
             <?php elseif (!$plan_has_cust): ?>
-            <!-- Upgrade nudge for basic without coupon -->
             <div style="background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(139,92,246,0.08));border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
                 <p style="font-size:13px;color:#a5b4fc;">Unlock 5 agents, customization & more</p>
                 <a href="select_plan.php?upgrade=1" style="font-size:12.5px;font-weight:700;color:white;background:#4F46E5;padding:7px 14px;border-radius:9px;text-decoration:none;white-space:nowrap;">Upgrade →</a>
             </div>
             <?php endif; ?>
         </div>
-        </div> 
+    </div>
 </section>
 
 </main>

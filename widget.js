@@ -1,8 +1,6 @@
 // widget.js — BitChat Widget
-// Reads data-site-id from script tag and sends it with every request
-
 (function () {
-  // ── 1. site_id script tag se lo ──────────────────────
+
   const scriptTag = document.currentScript ||
     document.querySelector('script[data-site-id]');
   const SITE_ID = scriptTag ? scriptTag.getAttribute('data-site-id') : '';
@@ -12,159 +10,346 @@
     return;
   }
 
-  const WEBHOOK_URL = 'https://n8n.bitchatbot.io/webhook/chat';
-  const SESSION_KEY = 'bitchat_session_' + SITE_ID;
+  const WEBHOOK_URL  = 'https://n8n.bitchatbot.io/webhook/chat';
+  const SETTINGS_URL = 'https://bitchatbot.io/get_chatbot_settings.php?site=';
+  const SESSION_KEY  = 'bitchat_session_' + SITE_ID;
 
-  // ── 2. Session ID — per site, per browser ────────────
   let sessionId = sessionStorage.getItem(SESSION_KEY);
   if (!sessionId) {
     sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
     sessionStorage.setItem(SESSION_KEY, sessionId);
   }
 
-  // ── 3. Styles ─────────────────────────────────────────
-  const style = document.createElement('style');
-  style.textContent = `
-    #bitchat-btn {
-      position:fixed; bottom:24px; right:24px; z-index:9999;
-      width:56px; height:56px; border-radius:50%;
-      background:linear-gradient(135deg,#7C3AED,#06B6D4);
-      border:none; cursor:pointer; box-shadow:0 4px 20px rgba(124,58,237,0.4);
-      display:flex; align-items:center; justify-content:center;
-      transition:transform 0.2s;
-    }
-    #bitchat-btn:hover { transform:scale(1.08); }
-    #bitchat-box {
-      position:fixed; bottom:90px; right:24px; z-index:9998;
-      width:330px; height:440px; border-radius:16px;
-      background:#111118; border:1px solid rgba(255,255,255,0.08);
-      box-shadow:0 8px 40px rgba(0,0,0,0.5);
-      display:none; flex-direction:column; overflow:hidden;
-      font-family:'Plus Jakarta Sans',sans-serif;
-    }
-    #bitchat-box.open { display:flex; }
-    #bc-header {
-      background:linear-gradient(135deg,#7C3AED,#06B6D4);
-      padding:14px 16px; display:flex; align-items:center;
-      justify-content:space-between; flex-shrink:0;
-    }
-    #bc-header .bc-title { color:white; font-weight:700; font-size:14px; }
-    #bc-header .bc-close {
-      background:none; border:none; color:white; cursor:pointer;
-      font-size:22px; line-height:1; padding:0 4px;
-      display:flex; align-items:center; justify-content:center;
-      width:28px; height:28px; border-radius:6px;
-      transition:background 0.15s;
-    }
-    #bc-header .bc-close:hover { background:rgba(255,255,255,0.2); }
-    #bc-messages {
-      flex:1; overflow-y:auto; padding:14px;
-      display:flex; flex-direction:column; gap:10px;
-    }
-    #bc-messages::-webkit-scrollbar { width:4px; }
-    #bc-messages::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:2px; }
-    .bc-msg-user {
-      align-self:flex-end; background:#7C3AED; color:white;
-      border-radius:14px 14px 4px 14px; padding:9px 13px;
-      font-size:13px; max-width:80%; line-height:1.5; word-break:break-word;
-    }
-    .bc-msg-bot {
-      align-self:flex-start; background:#1A1A26;
-      border:1px solid rgba(255,255,255,0.07);
-      color:#F1F1F5; border-radius:14px 14px 14px 4px;
-      padding:9px 13px; font-size:13px; max-width:80%;
-      line-height:1.5; word-break:break-word;
-    }
-    .bc-typing {
-      align-self:flex-start; background:#1A1A26;
-      border:1px solid rgba(255,255,255,0.07);
-      color:#6B7280; border-radius:14px 14px 14px 4px;
-      padding:9px 13px; font-size:13px;
-    }
-    #bc-input-row {
-      padding:10px 12px; border-top:1px solid rgba(255,255,255,0.07);
-      display:flex; gap:8px; background:#0A0A0F; flex-shrink:0;
-    }
-    #bc-input {
-      flex:1; background:#1A1A26; border:1px solid rgba(255,255,255,0.08);
-      border-radius:10px; padding:9px 13px; color:white;
-      font-size:13px; outline:none; font-family:inherit;
-    }
-    #bc-input::placeholder { color:#4B5563; }
-    #bc-send {
-      background:#7C3AED; border:none; border-radius:10px;
-      color:white; padding:9px 14px; cursor:pointer;
-      font-size:13px; font-weight:600; transition:background 0.15s;
-    }
-    #bc-send:hover { background:#8B5CF6; }
-    #bc-send:disabled { background:#4B5563; cursor:not-allowed; }
-    #bc-site-label {
-      text-align:center; font-size:10px; color:#374151;
-      padding:4px 0 6px; background:#0A0A0F; flex-shrink:0;
-    }
+  let CHAT_NAME    = 'Bitchat';
+  let CHAT_COLOR   = '#7C3AED';
+  let CHAT_GREETING = 'Hi! How can I assist you today?';
+  let hasGreeted   = false;
+  let isOpen       = false;
 
-    /* ── Mobile Responsive ── */
-    @media (max-width:480px) {
-      #bitchat-box {
-        width:calc(100vw - 24px) !important;
-        right:12px !important;
-        left:12px !important;
-        bottom:80px !important;
-        height:440px !important;
-        border-radius:16px !important;
-      }
+  // ── Style element ──
+  const styleEl = document.createElement('style');
+  document.head.appendChild(styleEl);
+
+  function applyStyles(color) {
+    styleEl.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
+
       #bitchat-btn {
-        bottom:16px !important;
-        right:16px !important;
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 9999;
+        height: 50px;
+        border-radius: 30px;
+        background: ${color};
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 20px ${color}66;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 0 18px 0 12px;
+        transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s, padding 0.2s;
+        font-family: 'Plus Jakarta Sans', sans-serif;
       }
-    }
-  `;
-  document.head.appendChild(style);
+      #bitchat-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 28px ${color}88;
+      }
+      #bitchat-btn.open {
+        padding: 0 13px;
+        border-radius: 50%;
+        width: 50px;
+        gap: 0;
+      }
+      #bitchat-btn .bc-btn-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.18);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s;
+      }
+      #bitchat-btn .bc-btn-label {
+        color: white;
+        font-weight: 700;
+        font-size: 13.5px;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        transition: opacity 0.18s, max-width 0.22s;
+        max-width: 160px;
+        overflow: hidden;
+      }
+      #bitchat-btn.open .bc-btn-label {
+        opacity: 0;
+        max-width: 0;
+        pointer-events: none;
+      }
 
-  // ── 4. HTML ───────────────────────────────────────────
-  const btn = document.createElement('button');
-  btn.id = 'bitchat-btn';
-  btn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      /* Chat icon (shown when closed) */
+      #bc-icon-chat   { display: block; }
+      #bc-icon-close  { display: none; }
+      #bitchat-btn.open #bc-icon-chat  { display: none; }
+      #bitchat-btn.open #bc-icon-close { display: block; }
+
+      #bitchat-box {
+        position: fixed;
+        bottom: 88px;
+        right: 24px;
+        z-index: 9998;
+        width: 340px;
+        height: 470px;
+        border-radius: 18px;
+        background: #111118;
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        opacity: 0;
+        transform: scale(0.88) translateY(12px);
+        pointer-events: none;
+        transition: opacity 0.28s cubic-bezier(0.34,1.56,0.64,1),
+                    transform 0.28s cubic-bezier(0.34,1.56,0.64,1);
+        transform-origin: bottom right;
+      }
+      #bitchat-box.open {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        pointer-events: all;
+      }
+
+      #bc-header {
+        background: ${color};
+        padding: 13px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        transition: background 0.3s;
+      }
+      #bc-header .bc-header-left { display: flex; align-items: center; gap: 10px; }
+      #bc-header .bc-avatar {
+        width: 32px; height: 32px; border-radius: 50%;
+        background: rgba(255,255,255,0.18);
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      }
+      #bc-header .bc-title { color: white; font-weight: 700; font-size: 14px; line-height: 1; }
+      #bc-header .bc-status { color: rgba(255,255,255,0.65); font-size: 11px; margin-top: 2px; }
+      #bc-header .bc-close {
+        background: rgba(255,255,255,0.12); border: none; color: white;
+        cursor: pointer; width: 28px; height: 28px; border-radius: 7px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px; transition: background 0.15s; flex-shrink: 0;
+      }
+      #bc-header .bc-close:hover { background: rgba(255,255,255,0.25); }
+
+      #bc-messages {
+        flex: 1; overflow-y: auto; padding: 14px;
+        display: flex; flex-direction: column; gap: 10px;
+      }
+      #bc-messages::-webkit-scrollbar { width: 4px; }
+      #bc-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+      .bc-msg-user {
+        align-self: flex-end;
+        background: ${color};
+        color: white;
+        border-radius: 14px 14px 4px 14px;
+        padding: 9px 13px;
+        font-size: 13px; max-width: 80%; line-height: 1.5; word-break: break-word;
+        transition: background 0.3s;
+      }
+      .bc-msg-bot {
+        align-self: flex-start; background: #1A1A26;
+        border: 1px solid rgba(255,255,255,0.07); color: #F1F1F5;
+        border-radius: 14px 14px 14px 4px; padding: 9px 13px;
+        font-size: 13px; max-width: 80%; line-height: 1.5; word-break: break-word;
+      }
+      .bc-typing {
+        align-self: flex-start; background: #1A1A26;
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 14px 14px 14px 4px; padding: 9px 13px;
+        display: inline-flex; align-items: center; gap: 4px;
+      }
+      .bc-typing span {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: ${color}; opacity: 0.5;
+        animation: bcDot 1.3s ease-in-out infinite;
+      }
+      .bc-typing span:nth-child(2) { animation-delay: 0.2s; }
+      .bc-typing span:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes bcDot {
+        0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+        30% { transform: translateY(-4px); opacity: 1; }
+      }
+
+      #bc-input-row {
+        padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.07);
+        display: flex; gap: 8px; background: #0A0A0F; flex-shrink: 0;
+        align-items: center;
+      }
+      #bc-input {
+        flex: 1; background: #1A1A26; border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 10px; padding: 9px 13px; color: white;
+        font-size: 13px; outline: none; font-family: inherit;
+        transition: border-color 0.2s;
+      }
+      #bc-input:focus { border-color: ${color}; }
+      #bc-input::placeholder { color: #4B5563; }
+
+      #bc-send {
+        background: ${color}; border: none; border-radius: 10px;
+        color: white; width: 38px; height: 38px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; transition: opacity 0.15s, background 0.3s;
+      }
+      #bc-send:hover { opacity: 0.85; }
+      #bc-send:disabled { background: #4B5563; cursor: not-allowed; }
+
+      #bc-footer {
+        text-align: center; padding: 5px 0 8px;
+        font-size: 10.5px; color: #4B5563;
+        background: #0A0A0F; flex-shrink: 0;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+      #bc-footer a { color: ${color}; font-weight: 700; text-decoration: none; }
+      #bc-footer a:hover { opacity: 0.8; }
+
+      @media (max-width: 480px) {
+        #bitchat-box {
+          width: calc(100vw - 24px) !important;
+          right: 12px !important; left: 12px !important;
+          bottom: 80px !important; height: 440px !important;
+          border-radius: 16px !important;
+        }
+        #bitchat-btn { bottom: 16px !important; right: 16px !important; }
+      }
+    `;
+  }
+
+  // ── SVG Icons ──
+  const ICON_CHAT = `<svg id="bc-icon-chat" width="15" height="15" viewBox="0 0 24 24" fill="none">
     <path d="M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
       stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 
+  const ICON_CLOSE = `<svg id="bc-icon-close" width="14" height="14" viewBox="0 0 24 24" fill="none">
+    <path d="M18 6L6 18M6 6L18 18" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+  </svg>`;
+
+  // ── Toggle Button ──
+  const btn = document.createElement('button');
+  btn.id = 'bitchat-btn';
+  btn.innerHTML = `
+    <div class="bc-btn-icon">
+      ${ICON_CHAT}
+      ${ICON_CLOSE}
+    </div>
+    <span class="bc-btn-label">${CHAT_NAME}</span>
+  `;
+
+  // ── Chat Box ──
   const box = document.createElement('div');
   box.id = 'bitchat-box';
   box.innerHTML = `
     <div id="bc-header">
-      <span class="bc-title">💬 Chat with us</span>
-      <button class="bc-close" id="bc-close-btn">&#x2715;</button>
+      <div class="bc-header-left">
+        <div class="bc-avatar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="6" width="18" height="14" rx="4" stroke="rgba(255,255,255,0.85)" stroke-width="1.8"/>
+            <circle cx="9" cy="13" r="1.5" fill="rgba(255,255,255,0.85)"/>
+            <circle cx="15" cy="13" r="1.5" fill="rgba(255,255,255,0.85)"/>
+          </svg>
+        </div>
+        <div>
+          <div class="bc-title" id="bc-header-name">${CHAT_NAME}</div>
+          <div class="bc-status">● Online</div>
+        </div>
+      </div>
+      <button class="bc-close" id="bc-close-btn">✕</button>
     </div>
     <div id="bc-messages"></div>
     <div id="bc-input-row">
       <input id="bc-input" placeholder="Type your message..." autocomplete="off"/>
-      <button id="bc-send">Send</button>
+      <button id="bc-send">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+          <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"
+            stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
-    <div id="bc-site-label">Powered by BitChat</div>
+    <div id="bc-footer">Powered by <a href="https://bitchatbot.io" target="_blank">bitchatbot.io</a></div>
   `;
 
   document.body.appendChild(btn);
   document.body.appendChild(box);
 
-  // ── 5. Toggle ─────────────────────────────────────────
-  btn.addEventListener('click', () => {
-    box.classList.toggle('open');
-    if (box.classList.contains('open') && !hasGreeted) {
-      addMsg('bot', 'Hello! How can I help you today?');
+  // Default styles apply karo pehle
+  applyStyles(CHAT_COLOR);
+
+  // ── DB se settings fetch karo ──
+  fetch(SETTINGS_URL + encodeURIComponent(SITE_ID))
+    .then(function(res) { return res.json(); })
+    .then(function(s) {
+      const name     = (s.chatbot_name  && s.chatbot_name.trim())  ? s.chatbot_name  : CHAT_NAME;
+      const color    = (s.primary_color && s.primary_color.trim()) ? s.primary_color : CHAT_COLOR;
+      const greeting = (s.greeting_msg  && s.greeting_msg.trim())  ? s.greeting_msg  : CHAT_GREETING;
+
+      CHAT_NAME     = name;
+      CHAT_COLOR    = color;
+      CHAT_GREETING = greeting;
+
+      // Toggle button label update
+      const label = btn.querySelector('.bc-btn-label');
+      if (label) label.textContent = name;
+
+      // Header name update
+      const headerName = document.getElementById('bc-header-name');
+      if (headerName) headerName.textContent = name;
+
+      // CSS colors update (toggle bg, header bg, user bubbles, send btn, etc.)
+      applyStyles(color);
+    })
+    .catch(function(err) {
+      console.warn('[BitChat] Settings fetch failed, using defaults.', err);
+    });
+
+  // ── Open / Close logic ──
+  function openChat() {
+    isOpen = true;
+    box.classList.add('open');
+    btn.classList.add('open');
+    if (!hasGreeted) {
+      addMsg('bot', CHAT_GREETING);
       hasGreeted = true;
     }
-  });
+    setTimeout(function() { inputEl.focus(); }, 300);
+  }
 
-  document.getElementById('bc-close-btn').addEventListener('click', () => {
+  function closeChat() {
+    isOpen = false;
     box.classList.remove('open');
+    btn.classList.remove('open');
+  }
+
+  btn.addEventListener('click', function() {
+    if (isOpen) { closeChat(); } else { openChat(); }
   });
 
-  // ── 6. Messaging ──────────────────────────────────────
-  const msgsEl = document.getElementById('bc-messages');
+  document.getElementById('bc-close-btn').addEventListener('click', function() {
+    closeChat();
+  });
+
+  // ── Messaging ──
+  const msgsEl  = document.getElementById('bc-messages');
   const inputEl = document.getElementById('bc-input');
   const sendBtn = document.getElementById('bc-send');
-  let hasGreeted = false;
 
   function addMsg(role, text) {
     const el = document.createElement('div');
@@ -179,7 +364,7 @@
     const el = document.createElement('div');
     el.className = 'bc-typing';
     el.id = 'bc-typing';
-    el.textContent = '...';
+    el.innerHTML = '<span></span><span></span><span></span>';
     msgsEl.appendChild(el);
     msgsEl.scrollTop = msgsEl.scrollHeight;
   }
@@ -192,26 +377,20 @@
   async function sendMessage() {
     const msg = inputEl.value.trim();
     if (!msg) return;
-
     addMsg('user', msg);
     inputEl.value = '';
     sendBtn.disabled = true;
     showTyping();
-
     try {
       const res = await fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          siteId:     SITE_ID,
-          site_id:    SITE_ID,
-          collection: SITE_ID,
-          sessionId:  sessionId,
-          chatInput:  msg,
-          question:   msg
+          siteId: SITE_ID, site_id: SITE_ID,
+          collection: SITE_ID, sessionId: sessionId,
+          chatInput: msg, question: msg
         })
       });
-
       const data = await res.json();
       removeTyping();
       addMsg('bot', data.answer || data.output || 'Sorry, I could not get a response.');
@@ -226,11 +405,8 @@
   }
 
   sendBtn.addEventListener('click', sendMessage);
-  inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+  inputEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
 
 })();
