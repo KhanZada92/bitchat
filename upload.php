@@ -32,22 +32,31 @@ if ($file_size > ($upload_limit * 1024 * 1024)) {
     echo json_encode(['success'=>false,'error'=>"Max {$upload_limit}MB allowed"]); exit();
 }
 
-// ── 2. site_id — SESSION ya USERNAME se lo, FILE NAME se NAHI ──
-// Yeh ensure karta hai dashboard aur Qdrant collection name MATCH kare
-// Dashboard mein: site_id = ahsan_qa
-// Qdrant mein:    collection = chatbot_ahsan_qa  ✓
-$site_id = $_SESSION['site_id'] ?? '';
+// ── 2. site_id from POST — which site is active ──
+$site_id = trim($_POST['site_ref'] ?? '');
 
 if (empty($site_id)) {
-    $username = $_SESSION['username'] ?? '';
-    if (!empty($username)) {
-        $site_id = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', str_replace(' ', '_', $username)));
+    // fallback: try session site_id for backward compat
+    $site_id = $_SESSION['site_id'] ?? '';
+}
+
+if (empty($site_id)) {
+    echo json_encode(['success'=>false,'error'=>'No site selected. Please select a site first.']); exit();
+}
+
+// Verify this site belongs to the user
+$chk = $conn->prepare("SELECT id FROM sites WHERE site_id=? AND user_id=?");
+$chk->bind_param("si", $site_id, $user_id); $chk->execute();
+if (!$chk->get_result()->fetch_assoc()) {
+    // Fallback: check if it's in users.site_id (backward compat for old accounts)
+    $chk2 = $conn->prepare("SELECT id FROM users WHERE site_id=? AND id=?");
+    $chk2->bind_param("si", $site_id, $user_id); $chk2->execute();
+    if (!$chk2->get_result()->fetch_assoc()) {
+        echo json_encode(['success'=>false,'error'=>'Invalid site selected']); exit();
     }
+    $chk2->close();
 }
-
-if (empty($site_id)) {
-    $site_id = 'user_' . $user_id;
-}
+$chk->close();
 
 error_log("[upload] site_id: $site_id | user_id: $user_id");
 
@@ -106,7 +115,6 @@ function extract_docx(string $path): array {
         if ($currentQ !== null && !empty($currentA)) {
             $pairs[] = ['question'=>$currentQ, 'answer'=>trim(implode(' ', $currentA))];
         }
-        error_log("[upload] DOCX pairs: " . count($pairs));
 
         if (empty($pairs)) {
             $rawText = '';
@@ -136,7 +144,6 @@ function extract_docx(string $path): array {
     }
 }
 
-// ── 4. Q:/A: parser ──────────────────────────────────
 function parse_qa_strict(string $text): array {
     $pairs = []; $q = ''; $a = '';
     foreach (array_filter(array_map('trim', explode("\n", $text))) as $line) {
@@ -153,7 +160,6 @@ function parse_qa_strict(string $text): array {
     return $pairs;
 }
 
-// ── 5. PDF extractor ─────────────────────────────────
 function extract_pdf(string $path): array {
     try {
         $parser = new \Smalot\PdfParser\Parser();
@@ -180,7 +186,6 @@ function extract_pdf(string $path): array {
     }
 }
 
-// ── 6. JSON extractor ────────────────────────────────
 function extract_json(string $path): array {
     $data = json_decode(file_get_contents($path), true);
     if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) return [];
@@ -201,14 +206,12 @@ switch ($ext) {
     default:     $qa_pairs = [];
 }
 
-error_log("[upload] Total Q&A pairs: " . count($qa_pairs));
-
 if (empty($qa_pairs)) {
     echo json_encode(['success'=>false,'error'=>'No Q&A pairs found. Check file format.']); exit();
 }
 
 // ── 8. Write temp JSON ────────────────────────────────
-$json_filename = $site_id . '.json';  // e.g. ahsan_qa.json
+$json_filename = $site_id . '.json';
 $json_tmp      = sys_get_temp_dir() . '/' . $json_filename;
 file_put_contents($json_tmp, json_encode($qa_pairs, JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT));
 
@@ -248,16 +251,16 @@ $drive_folder_id = '0AB2nBzt58cUxUk9PVA';
 $file_content    = file_get_contents($json_tmp);
 $metadata        = json_encode(['name'=>$json_filename,'parents'=>[$drive_folder_id]]);
 $boundary        = '----WLP'.uniqid();
-$body = "--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$metadata\r\n"
+$body_upload = "--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$metadata\r\n"
       . "--$boundary\r\nContent-Type: application/json\r\n\r\n$file_content\r\n--$boundary--";
 
 $ch = curl_init('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink,name');
 curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>30,
-    CURLOPT_POSTFIELDS=>$body,
-    CURLOPT_HTTPHEADER=>["Authorization: Bearer $token","Content-Type: multipart/related; boundary=$boundary","Content-Length: ".strlen($body)]]);
-$raw      = curl_exec($ch);
-$curl_err = curl_error($ch);
-$http_code= curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    CURLOPT_POSTFIELDS=>$body_upload,
+    CURLOPT_HTTPHEADER=>["Authorization: Bearer $token","Content-Type: multipart/related; boundary=$boundary","Content-Length: ".strlen($body_upload)]]);
+$raw       = curl_exec($ch);
+$curl_err  = curl_error($ch);
+$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 @unlink($json_tmp);
 
@@ -275,19 +278,22 @@ $now_dt       = date('Y-m-d H:i:s');
 
 $ins = $conn->prepare("INSERT INTO uploads (user_id, site_id, filename, file_size_kb, qa_count, status, created_at, drive_file_id) VALUES (?, ?, ?, ?, ?, 'done', ?, ?)");
 $ins->bind_param("issiiis", $user_id, $site_id, $json_filename, $file_size_kb, $qa_count, $now_dt, $drive_id);
-$ins->execute();
-$ins->close();
+$ins->execute(); $ins->close();
 
-// site_id hamesha update karo (file name se kabhi nahi)
-$upd = $conn->prepare("UPDATE users SET site_id=? WHERE id=?");
-$upd->bind_param("si", $site_id, $user_id);
-$upd->execute();
-$upd->close();
+// ── 12. Update sites table ────────────────────────────
+$upd_site = $conn->prepare("UPDATE sites SET has_data=1, qa_count=?, drive_file_id=? WHERE site_id=? AND user_id=?");
+$upd_site->bind_param("issi", $qa_count, $drive_id, $site_id, $user_id);
+$upd_site->execute(); $upd_site->close();
+
+// Also update legacy users.site_id if this is their primary
+$upd_user = $conn->prepare("UPDATE users SET site_id=? WHERE id=? AND (site_id IS NULL OR site_id='')");
+$upd_user->bind_param("si", $site_id, $user_id); $upd_user->execute(); $upd_user->close();
+
 $_SESSION['site_id'] = $site_id;
 
-// ── 12. Push to Qdrant ───────────────────────────────
+// ── 13. Push to Qdrant ───────────────────────────────
 $qdrant_base = 'http://n8n-n8n-7y0vkt-qdrant-1:6333';
-$collection  = 'chatbot_' . $site_id;  // e.g. chatbot_ahsan_qa ✓
+$collection  = 'chatbot_' . $site_id;
 
 error_log("[upload] Qdrant collection: $collection");
 
@@ -299,8 +305,7 @@ $create_body = json_encode(['vectors'=>['size'=>768,'distance'=>'Cosine']]);
 $ch = curl_init("$qdrant_base/collections/$collection");
 curl_setopt_array($ch,[CURLOPT_CUSTOMREQUEST=>'PUT',CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>10,
     CURLOPT_POSTFIELDS=>$create_body,CURLOPT_HTTPHEADER=>['Content-Type: application/json']]);
-$cr = curl_exec($ch); $cr_code = curl_getinfo($ch,CURLINFO_HTTP_CODE); curl_close($ch);
-error_log("[upload] Qdrant create HTTP $cr_code");
+curl_exec($ch); curl_close($ch);
 
 $ollama_base = 'http://n8n-n8n-7y0vkt-ollama-1:11434';
 $points      = [];
@@ -314,10 +319,7 @@ foreach ($qa_pairs as $idx => $pair) {
     $emb_data = json_decode($emb_raw, true);
     $vector   = $emb_data['embeddings'][0] ?? $emb_data['embedding'] ?? null;
 
-    if (!$vector || count($vector) !== 768) {
-        error_log("[upload] Embedding failed idx $idx");
-        continue;
-    }
+    if (!$vector || count($vector) !== 768) continue;
 
     $points[] = [
         'id'      => $idx + 1,
@@ -333,19 +335,14 @@ if (!empty($points)) {
     curl_setopt_array($ch,[CURLOPT_CUSTOMREQUEST=>'PUT',CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>60,
         CURLOPT_POSTFIELDS=>$upsert_body,
         CURLOPT_HTTPHEADER=>['Content-Type: application/json','Content-Length: '.strlen($upsert_body)]]);
-    $upsert_raw  = curl_exec($ch);
-    $upsert_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    error_log("[upload] Qdrant upsert HTTP $upsert_code | points: ".count($points));
+    curl_exec($ch); curl_close($ch);
 }
 
-// ── 13. Return ────────────────────────────────────────
 echo json_encode([
     'success'        => true,
     'site_id'        => $site_id,
     'qa_count'       => $qa_count,
     'vectors_stored' => count($points),
     'drive_file_id'  => $drive_id,
-    'drive_link'     => $res['webViewLink'] ?? null,
     'filename'       => $json_filename,
 ]);
