@@ -194,7 +194,7 @@ $plan_limits = ['basic'=>1,'starter'=>5,'pro'=>10];
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Bitchat</title>
+<title>Admin — Bitchatbot</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -257,7 +257,7 @@ tr.client-row:hover td { background:rgba(255,255,255,0.02); }
         <div style="width:30px;height:30px;background:linear-gradient(135deg,#7C3AED,#06B6D4);border-radius:8px;display:flex;align-items:center;justify-content:center;">
             <svg fill="none" stroke="white" viewBox="0 0 24 24" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         </div>
-        <span style="font-weight:700;font-size:15px;color:white;">Bitchat Admin</span>
+        <span style="font-weight:700;font-size:15px;color:white;">Bitchatbot Admin</span>
     </div>
     <span style="font-size:12.5px;color:var(--muted);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
     <a href="logout.php" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#F87171;padding:6px 14px;border-radius:8px;font-size:12.5px;font-weight:600;text-decoration:none;">Logout</a>
