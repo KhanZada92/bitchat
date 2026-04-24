@@ -187,14 +187,72 @@ function extract_pdf(string $path): array {
 }
 
 function extract_json(string $path): array {
-    $data = json_decode(file_get_contents($path), true);
+    $raw  = file_get_contents($path);
+    $data = json_decode($raw, true);
+
     if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) return [];
+
     $pairs = [];
-    foreach ($data as $item) {
-        if (!empty($item['question']) && !empty($item['answer'])) {
-            $pairs[] = ['question'=>trim($item['question']),'answer'=>trim($item['answer'])];
+
+    // ── Format 1: [{question, answer}] ──
+    if (isset($data[0]) && is_array($data[0])) {
+        foreach ($data as $item) {
+            // Various key names people use
+            $q = $item['question'] ?? $item['q'] ?? $item['Query'] ?? $item['query'] ?? $item['title'] ?? '';
+            $a = $item['answer']   ?? $item['a'] ?? $item['Answer'] ?? $item['response'] ?? $item['content'] ?? $item['text'] ?? '';
+            if (!empty($q) && !empty($a)) {
+                $pairs[] = ['question'=>trim($q), 'answer'=>trim($a)];
+            }
         }
+        if (!empty($pairs)) return $pairs;
     }
+
+    // ── Format 2: {faqs: [{question, answer}]} ──
+    $container = $data['faqs'] ?? $data['data'] ?? $data['items'] ?? $data['qa'] ?? $data['questions'] ?? null;
+    if (is_array($container)) {
+        foreach ($container as $item) {
+            $q = $item['question'] ?? $item['q'] ?? $item['title'] ?? '';
+            $a = $item['answer']   ?? $item['a'] ?? $item['content'] ?? $item['text'] ?? '';
+            if (!empty($q) && !empty($a)) {
+                $pairs[] = ['question'=>trim($q), 'answer'=>trim($a)];
+            }
+        }
+        if (!empty($pairs)) return $pairs;
+    }
+
+    // ── Format 3: {"Question text": "Answer text", ...} (key=value object) ──
+    if (!isset($data[0])) {
+        foreach ($data as $k => $v) {
+            if (is_string($k) && is_string($v) && strlen($k) > 5 && strlen($v) > 5) {
+                $pairs[] = ['question'=>trim($k), 'answer'=>trim($v)];
+            }
+        }
+        if (!empty($pairs)) return $pairs;
+    }
+
+    // ── Format 4: [{title, body/description}] — blog/article style ──
+    if (isset($data[0]) && is_array($data[0])) {
+        foreach ($data as $item) {
+            $q = $item['title'] ?? $item['heading'] ?? $item['topic'] ?? '';
+            $a = $item['body']  ?? $item['description'] ?? $item['content'] ?? $item['detail'] ?? '';
+            if (!empty($q) && !empty($a)) {
+                $pairs[] = ['question'=>trim($q), 'answer'=>trim($a)];
+            }
+        }
+        if (!empty($pairs)) return $pairs;
+    }
+
+    // ── Format 5: Raw text array ["Q: ... A: ..."] ──
+    if (isset($data[0]) && is_string($data[0])) {
+        $combined = implode("\n", $data);
+        return parse_qa_strict($combined);
+    }
+
+    // ── Format 6: Single string (raw text stored as JSON string) ──
+    if (is_string($data)) {
+        return parse_qa_strict($data);
+    }
+
     return $pairs;
 }
 

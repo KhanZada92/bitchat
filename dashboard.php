@@ -153,9 +153,9 @@ $recent_chats = array_slice(array_reverse($chats), 0, 5);
 
 $customData = ['chatbot_name' => 'Bitchat Assistant', 'primary_color' => '#6C3CE1'];
 if ($plan_has_cust) {
-    $cstmt = $conn->prepare("SELECT chatbot_name, primary_color FROM chatbot_settings WHERE user_id = ?");
+    $cstmt = $conn->prepare("SELECT chatbot_name, primary_color FROM chatbot_settings WHERE user_id = ? AND site_id = ?");
     if ($cstmt) {
-        $cstmt->bind_param("i", $user_id); $cstmt->execute();
+        $cstmt->bind_param("is", $user_id, $site_id); $cstmt->execute();
         $crow = $cstmt->get_result()->fetch_assoc(); $cstmt->close();
         if ($crow) $customData = array_merge($customData, $crow);
     }
@@ -390,7 +390,7 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; -webkit-fon
 
   <span class="sidebar-section-label">Customization</span>
   <?php if($plan_has_cust): ?>
-  <a href="chatbot_customize.php" class="nav-item" style="text-decoration:none;">
+  <a href="chatbot_customize.php?site=<?php echo urlencode($active_site_id); ?>" class="nav-item" style="text-decoration:none;">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
     Customize
   </a>

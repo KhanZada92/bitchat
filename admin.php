@@ -52,15 +52,33 @@ $active_tab = $_GET['tab'] ?? 'users';
 $clients = $conn->query("
     SELECT u.id, u.username, u.email, u.site_id, u.status, u.plan, u.max_chatbots,
            u.created_at, u.website_url, u.coupon_expires_at,
-           COUNT(ch.id) as total_chats, MAX(ch.created_at) as last_chat,
+           COUNT(DISTINCT ch.id) as total_chats, MAX(ch.created_at) as last_chat,
            cs.chatbot_name, cs.primary_color, cs.updated_at as customized_at
     FROM users u
     LEFT JOIN chat_history ch ON ch.site_id = u.site_id
-    LEFT JOIN chatbot_settings cs ON cs.user_id = u.id
+    LEFT JOIN chatbot_settings cs ON cs.user_id = u.id AND cs.site_id = u.site_id
     WHERE u.role = 'client'
     GROUP BY u.id
     ORDER BY u.created_at DESC
 ")->fetch_all(MYSQLI_ASSOC);
+
+// Load per-user site stats
+$site_stats = [];
+$ss_res = $conn->query("
+    SELECT
+        s.user_id,
+        COUNT(s.id) as site_count,
+        SUM(s.has_data) as sites_with_data,
+        GROUP_CONCAT(s.site_id ORDER BY s.created_at ASC SEPARATOR '|||') as site_ids,
+        GROUP_CONCAT(s.site_name ORDER BY s.created_at ASC SEPARATOR '|||') as site_names
+    FROM sites s
+    GROUP BY s.user_id
+");
+if ($ss_res) {
+    while ($sr = $ss_res->fetch_assoc()) {
+        $site_stats[$sr['user_id']] = $sr;
+    }
+}
 
 $total    = count($clients);
 $active_u = count(array_filter($clients, fn($c) => $c['status']==='approved'));
@@ -274,7 +292,27 @@ tr.client-row:hover td { background:rgba(255,255,255,0.02); }
                     </div>
                 </td>
                 <td>
+                    <?php
+                    $uid = $c['id'];
+                    $ustat = $site_stats[$uid] ?? null;
+                    if ($ustat && $ustat['site_count'] > 0):
+                        $sids   = explode('|||', $ustat['site_ids'] ?? '');
+                        $snames = explode('|||', $ustat['site_names'] ?? '');
+                    ?>
+                    <div style="display:flex;flex-direction:column;gap:4px;">
+                        <?php foreach($sids as $si => $sid): $sname = $snames[$si] ?? $sid; ?>
+                        <div style="display:flex;align-items:center;gap:5px;">
+                            <code style="background:rgba(124,58,237,0.1);color:#A78BFA;padding:2px 7px;border-radius:5px;font-size:10.5px;"><?php echo htmlspecialchars($sid); ?></code>
+                            <span style="font-size:10px;color:var(--muted);"><?php echo htmlspecialchars($sname); ?></span>
+                        </div>
+                        <?php endforeach; ?>
+                        <span style="font-size:10px;color:#67E8F9;margin-top:2px;">
+                            <?php echo $ustat['site_count']; ?> site(s) · <?php echo (int)$ustat['sites_with_data']; ?> active
+                        </span>
+                    </div>
+                    <?php else: ?>
                     <code style="background:rgba(124,58,237,0.1);color:#A78BFA;padding:3px 8px;border-radius:6px;font-size:11.5px;"><?php echo htmlspecialchars($c['site_id']??'—'); ?></code>
+                    <?php endif; ?>
                 </td>
                 <td>
                     <span class="tag plan-<?php echo $c['plan']??'basic'; ?>"><?php echo strtoupper($c['plan']??'BASIC'); ?></span>

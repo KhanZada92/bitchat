@@ -13,43 +13,54 @@ $default = [
 
 if (empty($site_id)) { echo json_encode($default); exit(); }
 
+// 1. Get site info + user info
 $stmt = $conn->prepare("
-    SELECT
-        cs.chatbot_name,
-        cs.primary_color,
-        cs.greeting_msg,
-        s.website_url
+    SELECT s.website_url, u.id as user_id, u.plan
     FROM sites s
     INNER JOIN users u ON u.id = s.user_id
-    LEFT JOIN chatbot_settings cs ON cs.user_id = u.id
-    WHERE s.site_id = ?
-      AND u.role = 'client'
-      AND u.status = 'approved'
+    WHERE s.site_id = ? AND u.role='client' AND u.status='approved'
     LIMIT 1
 ");
 $stmt->bind_param("s", $site_id);
 $stmt->execute();
-$row = $stmt->get_result()->fetch_assoc();
+$site_row = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-// Fallback: also check old users table site_id for backward compat
-if (!$row) {
-    $stmt2 = $conn->prepare("
-        SELECT cs.chatbot_name, cs.primary_color, cs.greeting_msg, u.website_url
-        FROM users u
-        LEFT JOIN chatbot_settings cs ON cs.user_id = u.id
-        WHERE u.site_id = ? AND u.role='client' AND u.status='approved'
+// Backward compat: try users.site_id if no sites table match
+if (!$site_row) {
+    $stmt2 = $conn->prepare("SELECT id as user_id, plan, website_url FROM users WHERE site_id=? AND role='client' AND status='approved' LIMIT 1");
+    $stmt2->bind_param("s", $site_id); $stmt2->execute();
+    $site_row = $stmt2->get_result()->fetch_assoc(); $stmt2->close();
+}
+
+if (!$site_row) { echo json_encode($default); exit(); }
+
+$user_id = $site_row['user_id'];
+$plan    = $site_row['plan'] ?? 'basic';
+
+// 2. Per-site customization — STRICT site_id match only.
+// NO fallback to other sites — prevents one site's settings bleeding into others.
+$custom = null;
+if (in_array($plan, ['starter', 'pro'])) {
+    $cs = $conn->prepare("
+        SELECT chatbot_name, primary_color, greeting_msg
+        FROM chatbot_settings
+        WHERE user_id = ? AND site_id = ?
         LIMIT 1
     ");
-    $stmt2->bind_param("s", $site_id);
-    $stmt2->execute();
-    $row = $stmt2->get_result()->fetch_assoc();
-    $stmt2->close();
+    if ($cs) {
+        $cs->bind_param("is", $user_id, $site_id);
+        $cs->execute();
+        $custom = $cs->get_result()->fetch_assoc();
+        $cs->close();
+    }
+    // If $custom is null here — this site has no customization yet.
+    // Return defaults. Do NOT fall back to another site's settings.
 }
 
 echo json_encode([
-    'chatbot_name'  => (!empty($row['chatbot_name']))  ? $row['chatbot_name']  : $default['chatbot_name'],
-    'primary_color' => (!empty($row['primary_color'])) ? $row['primary_color'] : $default['primary_color'],
-    'greeting_msg'  => (!empty($row['greeting_msg']))  ? $row['greeting_msg']  : $default['greeting_msg'],
-    'website_url'   => $row['website_url'] ?? '',
+    'chatbot_name'  => (!empty($custom['chatbot_name']))  ? $custom['chatbot_name']  : $default['chatbot_name'],
+    'primary_color' => (!empty($custom['primary_color'])) ? $custom['primary_color'] : $default['primary_color'],
+    'greeting_msg'  => (!empty($custom['greeting_msg']))  ? $custom['greeting_msg']  : $default['greeting_msg'],
+    'website_url'   => $site_row['website_url'] ?? '',
 ]);
