@@ -340,7 +340,7 @@ body {
   </div>
 
   <!-- FOOTER -->
-  <div class="bc-footer-bar">Powered by <strong>bitchat.io</strong></div>
+  <div class="bc-footer-bar">Powered by <strong>bitchatbot.io</strong></div>
 
 </div>
 
@@ -418,7 +418,7 @@ async function bcLoadSettings(siteId) {
     );
     const s = await res.json();
 
-    const name  = (s.chatbot_name  && s.chatbot_name.trim())  ? s.chatbot_name  : 'Bitchat Assistant';
+    const name  = (s.chatbot_name  && s.chatbot_name.trim())  ? s.chatbot_name  : 'Bitchatbot Assistant';
     const color = (s.primary_color && s.primary_color.trim()) ? s.primary_color : '#6C3CE1';
 
     // Header name update
