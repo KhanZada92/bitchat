@@ -740,7 +740,7 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; -webkit-fon
       </div>
       <div class="settings-card-body">
         <div class="info-row"><span class="info-label">Current Plan</span><span class="info-val" style="font-weight:700;"><?php echo strtoupper($plan); ?> — <?php echo $plan_prices[$plan]??''; ?></span></div>
-        <div class="info-row"><span class="info-label">Plan Status</span><span class="info-val" style="font-weight:700;color:<?php echo $plan_expired?'var(--red)':($days_left<=5?'var(--amber)':'var(--green)'); ?>;"><?php echo $plan_expired?'Expired':($days_left<=5?$days_left.' days left':'Active'); ?></span></div>
+        <div class="info-row"><span class="info-label">Plan Status</span><span class="info-val" style="font-weight:700;color:<?php echo $plan_expired?'var(--red)':($days_left<=5?'var(--amber)':'var(--green)'); ?>;"><?php echo $plan_expired?'Expired':$days_left.' days remaining'; ?></span></div>
         <?php if($plan_expiry_date): ?>
         <div class="info-row"><span class="info-label">Expiry Date</span><span class="info-val"><?php echo date('d M Y', strtotime($plan_expiry_date)); ?></span></div>
         <?php endif; ?>
