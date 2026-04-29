@@ -39,10 +39,10 @@ if ($plan_expiry_date) {
     }
 }
 
-// If plan expired, restrict access
+// If plan expired, restrict access - redirect to renew page
 if ($plan_expired && $_SESSION['role'] !== 'admin') {
-    // Allow viewing dashboard but restrict functionality
-    // Will show expiry banner and disable features
+    // Allow viewing dashboard but with restrictions (banners, disabled features)
+    // User can see their data but must renew to use chatbot
 }
 
 if ($_SESSION['status'] === 'pending') {
@@ -199,7 +199,7 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — Bitchat</title>
+<title>Dashboard — Bitchatbot</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -338,7 +338,7 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; -webkit-fon
   </button>
   <div class="topbar-logo">
     <div class="logo-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <span class="logo-text">Bitchat</span>
+    <span class="logo-text">Bitchatbot</span>
   </div>
   <div class="plan-chip" style="background:<?php echo $pc['bg'];?>;color:<?php echo $pc['color'];?>;border:1px solid <?php echo $pc['border'];?>;"><?php echo strtoupper($plan); ?></div>
   <?php if($coupon_active): ?><div style="font-size:11px;color:var(--green);background:var(--green-bg);border:1px solid var(--green-border);padding:3px 10px;border-radius:20px;font-family:'DM Mono',monospace;"><?php echo $coupon_days_left; ?>d coupon</div><?php endif; ?>

@@ -351,6 +351,7 @@ if($active_tab==='users'): ?>
         <thead><tr>
             <th style="text-align:left;">Client</th>
             <th style="text-align:left;">Plan</th>
+            <th style="text-align:left;">Plan Status</th>
             <th style="text-align:left;">Sites</th>
             <th style="text-align:left;">Chats</th>
             <th style="text-align:left;">Status</th>
@@ -359,7 +360,7 @@ if($active_tab==='users'): ?>
         </tr></thead>
         <tbody>
         <?php if(empty($clients)): ?>
-        <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);">No clients yet.</td></tr>
+        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);">No clients yet.</td></tr>
         <?php endif; ?>
         <?php foreach($clients as $c):
             $uid       = $c['id'];
@@ -383,6 +384,17 @@ if($active_tab==='users'): ?>
                 <?php if(!empty($c['coupon_expires_at'])&&strtotime($c['coupon_expires_at'])>time()):?>
                 <span style="font-size:10px;color:#10B981;display:block;margin-top:3px;">🎟️ Exp <?php echo date('d M',strtotime($c['coupon_expires_at'])); ?></span>
                 <?php endif;?>
+            </td>
+            <td>
+                <?php if($c['plan_status'] === 'expired'): ?>
+                <span class="tag" style="background:rgba(239,68,68,0.12);color:#F87171;">❌ Expired</span>
+                <?php elseif($c['plan_status'] === 'expiring_soon'): ?>
+                <span class="tag" style="background:rgba(251,191,36,0.12);color:#FBBF24;">⚠️ <?php echo $c['days_left']; ?> days left</span>
+                <?php elseif($c['plan_status'] === 'active'): ?>
+                <span class="tag" style="background:rgba(16,185,129,0.12);color:#6EE7B7;">✓ <?php echo $c['days_left']; ?> days</span>
+                <?php else: ?>
+                <span class="tag" style="background:rgba(107,114,128,0.12);color:#9CA3AF;">No Plan</span>
+                <?php endif; ?>
             </td>
             <td>
                 <?php if(empty($usites)): ?>
