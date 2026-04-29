@@ -352,6 +352,7 @@ if($active_tab==='users'): ?>
             <th style="text-align:left;">Client</th>
             <th style="text-align:left;">Plan</th>
             <th style="text-align:left;">Plan Status</th>
+            <th style="text-align:left;">Expiry Date</th>
             <th style="text-align:left;">Sites</th>
             <th style="text-align:left;">Chats</th>
             <th style="text-align:left;">Status</th>
@@ -360,7 +361,7 @@ if($active_tab==='users'): ?>
         </tr></thead>
         <tbody>
         <?php if(empty($clients)): ?>
-        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);">No clients yet.</td></tr>
+        <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted);">No clients yet.</td></tr>
         <?php endif; ?>
         <?php foreach($clients as $c):
             $uid       = $c['id'];
@@ -394,6 +395,14 @@ if($active_tab==='users'): ?>
                 <span class="tag" style="background:rgba(16,185,129,0.12);color:#6EE7B7;">✓ <?php echo $c['days_left']; ?> days</span>
                 <?php else: ?>
                 <span class="tag" style="background:rgba(107,114,128,0.12);color:#9CA3AF;">No Plan</span>
+                <?php endif; ?>
+            </td>
+            <td>
+                <?php if(!empty($c['plan_expiry_date'])): ?>
+                <div style="font-size:12.5px;color:white;font-weight:600;"><?php echo date('d M Y', strtotime($c['plan_expiry_date'])); ?></div>
+                <div style="font-size:10.5px;color:var(--muted);margin-top:2px;"><?php echo date('h:i A', strtotime($c['plan_expiry_date'])); ?></div>
+                <?php else: ?>
+                <span style="font-size:11.5px;color:var(--muted);">—</span>
                 <?php endif; ?>
             </td>
             <td>
