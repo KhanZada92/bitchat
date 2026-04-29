@@ -38,9 +38,10 @@ if (!$cpn) {
 }
 
 // Apply to user
+$start_date = date('Y-m-d H:i:s');
 $exp = date('Y-m-d H:i:s', strtotime('+' . $cpn['duration_days'] . ' days'));
-$upd = $conn->prepare("UPDATE users SET plan=?, upload_limit_mb=?, max_chatbots=1, coupon_code=?, coupon_expires_at=? WHERE id=?");
-$upd->bind_param("sissi", $cpn['plan'], $cpn['upload_limit_mb'], $code, $exp, $user_id);
+$upd = $conn->prepare("UPDATE users SET plan=?, upload_limit_mb=?, max_chatbots=1, coupon_code=?, coupon_expires_at=?, plan_start_date=?, plan_expiry_date=? WHERE id=?");
+$upd->bind_param("sississi", $cpn['plan'], $cpn['upload_limit_mb'], $code, $exp, $start_date, $exp, $user_id);
 $upd->execute(); $upd->close();
 
 // Increment usage
@@ -51,6 +52,8 @@ $_SESSION['plan']              = $cpn['plan'];
 $_SESSION['upload_limit_mb']   = $cpn['upload_limit_mb'];
 $_SESSION['coupon_expires_at'] = $exp;
 $_SESSION['coupon_code']       = $code;
+$_SESSION['plan_start_date']   = $start_date;
+$_SESSION['plan_expiry_date']  = $exp;
 
 echo json_encode([
     'success' => true,

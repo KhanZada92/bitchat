@@ -31,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email            = trim($_POST['email'] ?? '');
     $password         = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
+    $email_consent    = isset($_POST['email_consent']) ? 1 : 0;
     // POST sa bhi plan lo (hidden field se)
     $post_plan = $_POST['selected_plan'] ?? '';
     if (in_array($post_plan, $allowed_plans)) {
@@ -42,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Valid email required";
     if (empty($password) || strlen($password) < 6) $errors[] = "Password must be at least 6 characters";
     if ($password !== $confirm_password) $errors[] = "Passwords do not match";
+    if (!isset($_POST['email_consent'])) $errors[] = "You must agree to receive email notifications";
 
     if (empty($errors)) {
         $stmt = $conn->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
@@ -52,8 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($errors)) {
         $hashed = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, status, plan) VALUES (?, ?, ?, 'client', 'pending', NULL)");
-        $stmt->bind_param("sss", $username, $email, $hashed);
+        $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, status, plan, email_consent) VALUES (?, ?, ?, 'client', 'pending', NULL, ?)");
+        $stmt->bind_param("sssi", $username, $email, $hashed, $email_consent);
 
         if ($stmt->execute()) {
             $new_id = $conn->insert_id;
@@ -180,6 +182,18 @@ label { display:block; font-size:12.5px; font-weight:600; color:#9CA3AF; margin-
                 Create Account <?php echo !empty($selected_plan) ? '& Go to '.$plan_labels[$selected_plan] : ''; ?> →
             </button>
         </form>
+
+        <!-- Email Consent -->
+        <div style="margin-top:16px;padding:14px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.15);border-radius:10px;">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:0;">
+                <input type="checkbox" name="email_consent" value="1" required style="margin-top:2px;width:16px;height:16px;cursor:pointer;">
+                <span style="font-size:12.5px;color:#9CA3AF;line-height:1.5;">
+                    I agree to receive email notifications including <strong style="color:#D1D5DB;">plan expiry alerts</strong>, 
+                    <strong style="color:#D1D5DB;">renewal reminders</strong>, and important account updates. 
+                    <a href="privacy.php" target="_blank" style="color:#818cf8;text-decoration:underline;">Privacy Policy</a>
+                </span>
+            </label>
+        </div>
 
         <div style="display:flex;align-items:center;gap:10px;margin:20px 0;">
             <div style="flex:1;height:1px;background:rgba(255,255,255,0.05);"></div>

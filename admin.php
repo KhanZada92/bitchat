@@ -75,16 +75,47 @@ $active_tab = $_GET['tab'] ?? 'users';
 // ============ MAIN DATA ============
 $clients_res = $conn->query("
     SELECT u.id, u.username, u.email, u.site_id, u.status, u.plan, u.max_chatbots,
-           u.created_at, u.website_url, u.coupon_expires_at, u.upload_limit_mb
+           u.created_at, u.website_url, u.coupon_expires_at, u.upload_limit_mb,
+           u.plan_start_date, u.plan_expiry_date, u.email_consent,
+           u.stripe_subscription_id
     FROM users u
     WHERE u.role = 'client'
     ORDER BY u.created_at DESC
 ");
 $clients = $clients_res ? $clients_res->fetch_all(MYSQLI_ASSOC) : [];
 
+// Calculate expiry status for each user
+foreach ($clients as &$c) {
+    $c['plan_status'] = 'no_plan';
+    $c['days_left'] = 999;
+    
+    if (!empty($c['plan_expiry_date']) && !empty($c['plan']) && $c['plan'] !== 'none') {
+        $expiry = new DateTime($c['plan_expiry_date']);
+        $today = new DateTime();
+        $today->setTime(0, 0, 0);
+        
+        if ($expiry < $today) {
+            $c['plan_status'] = 'expired';
+            $c['days_left'] = 0;
+        } else {
+            $diff = $today->diff($expiry);
+            $c['days_left'] = $diff->days;
+            
+            if ($c['days_left'] <= 3) {
+                $c['plan_status'] = 'expiring_soon';
+            } else {
+                $c['plan_status'] = 'active';
+            }
+        }
+    }
+}
+unset($c);
+
 $total    = count($clients);
 $active_u = count(array_filter($clients, fn($c) => $c['status']==='approved'));
 $banned_u = count(array_filter($clients, fn($c) => $c['status']==='banned'));
+$expired_users = count(array_filter($clients, fn($c) => $c['plan_status']==='expired'));
+$expiring_users = count(array_filter($clients, fn($c) => $c['plan_status']==='expiring_soon'));
 
 // ── Per-user SITES data (all sites) ──
 $all_user_sites = [];
@@ -276,6 +307,9 @@ tr.client-row:hover td { background:rgba(255,255,255,0.02); }
             <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Total Sites</span><span style="font-size:14px;font-weight:800;color:#67E8F9;"><?php echo $total_sites; ?></span></div>
             <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Messages</span><span style="font-size:14px;font-weight:800;color:#67E8F9;"><?php echo $total_all_chats; ?></span></div>
             <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Sessions</span><span style="font-size:14px;font-weight:800;color:#A78BFA;"><?php echo $total_all_sessions; ?></span></div>
+            <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
+            <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Plans Expired</span><span style="font-size:14px;font-weight:800;color:#F87171;"><?php echo $expired_users; ?></span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Expiring Soon</span><span style="font-size:14px;font-weight:800;color:#FBBF24;"><?php echo $expiring_users; ?></span></div>
         </div>
     </div>
 

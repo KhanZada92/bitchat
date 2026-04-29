@@ -68,8 +68,13 @@ switch ($event->type) {
 
             if ($user_id && isset($plan_config[$plan])) {
                 $cfg = $plan_config[$plan];
-                $stmt = $conn->prepare("UPDATE users SET plan=?, upload_limit_mb=?, max_chatbots=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?");
-                $stmt->bind_param("siissi", $plan, $cfg['upload_limit_mb'], $cfg['max_chatbots'], $cust_id, $sub_id, $user_id);
+                
+                // Calculate plan expiry (30 days from now)
+                $start_date = date('Y-m-d H:i:s');
+                $expiry_date = date('Y-m-d H:i:s', strtotime('+30 days'));
+                
+                $stmt = $conn->prepare("UPDATE users SET plan=?, upload_limit_mb=?, max_chatbots=?, stripe_customer_id=?, stripe_subscription_id=?, plan_start_date=?, plan_expiry_date=? WHERE id=?");
+                $stmt->bind_param("siissssi", $plan, $cfg['upload_limit_mb'], $cfg['max_chatbots'], $cust_id, $sub_id, $start_date, $expiry_date, $user_id);
                 $stmt->execute(); $stmt->close();
                 webhook_log($conn, $event->type, $user_id, $plan, 'activated', $sub_id);
             }

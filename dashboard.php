@@ -6,7 +6,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in'])) {
 }
 
 // Fresh user data from DB
-$stmt = $conn->prepare("SELECT role, status, site_id, username, email, website_url, plan, upload_limit_mb, coupon_code, coupon_expires_at, max_chatbots, stripe_subscription_id FROM users WHERE id = ?");
+$stmt = $conn->prepare("SELECT role, status, site_id, username, email, website_url, plan, upload_limit_mb, coupon_code, coupon_expires_at, max_chatbots, stripe_subscription_id, plan_start_date, plan_expiry_date, email_consent FROM users WHERE id = ?");
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
@@ -18,6 +18,31 @@ if ($_SESSION['role'] === 'admin') { header('Location: admin.php'); exit(); }
 $current_plan = $_SESSION['plan'] ?? '';
 if (empty($current_plan) || $current_plan === 'none') {
     header('Location: select_plan.php'); exit();
+}
+
+// ── Plan Expiry Check ──
+$plan_expired = false;
+$days_left = 999;
+$plan_expiry_date = $_SESSION['plan_expiry_date'] ?? null;
+
+if ($plan_expiry_date) {
+    $expiry = new DateTime($plan_expiry_date);
+    $today = new DateTime();
+    $today->setTime(0, 0, 0);
+    
+    if ($expiry < $today) {
+        $plan_expired = true;
+        $days_left = 0;
+    } else {
+        $diff = $today->diff($expiry);
+        $days_left = $diff->days;
+    }
+}
+
+// If plan expired, restrict access
+if ($plan_expired && $_SESSION['role'] !== 'admin') {
+    // Allow viewing dashboard but restrict functionality
+    // Will show expiry banner and disable features
 }
 
 if ($_SESSION['status'] === 'pending') {
@@ -104,6 +129,7 @@ $plan          = $_SESSION['plan'] ?? 'basic';
 $upload_limit  = $_SESSION['upload_limit_mb'] ?? 5;
 $coupon_exp    = $_SESSION['coupon_expires_at'] ?? null;
 $stripe_sub_id = $_SESSION['stripe_subscription_id'] ?? '';
+$email_consent = $_SESSION['email_consent'] ?? 0;
 
 $coupon_active = false; $coupon_days_left = 0;
 if ($coupon_exp) {
@@ -442,6 +468,31 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; -webkit-fon
   </div>
 </div>
 
+<!-- ── Plan Expiry Banner ── -->
+<?php if($plan_expired): ?>
+<div class="alert-banner" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);margin-bottom:20px;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;color:var(--red);">
+    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+  </svg>
+  <div style="flex:1;">
+    <p style="font-size:13.5px;font-weight:700;color:var(--red);">Your plan has expired</p>
+    <p style="font-size:12px;color:rgba(248,113,113,0.8);margin-top:2px;">Your chatbot is no longer active. Renew your plan to restore service.</p>
+  </div>
+  <a href="select_plan.php?renew=1" class="btn btn-primary" style="font-size:12px;padding:8px 16px;flex-shrink:0;">Renew Plan →</a>
+</div>
+<?php elseif($days_left <= 5 && $days_left > 0): ?>
+<div class="alert-banner" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);margin-bottom:20px;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;color:var(--amber);">
+    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+  </svg>
+  <div style="flex:1;">
+    <p style="font-size:13.5px;font-weight:700;color:var(--amber);">Plan expires in <?php echo $days_left; ?> <?php echo $days_left==1?'day':'days'; ?></p>
+    <p style="font-size:12px;color:rgba(251,191,36,0.8);margin-top:2px;">Renew now to avoid interruption.</p>
+  </div>
+  <a href="select_plan.php?renew=1" class="btn btn-secondary" style="font-size:12px;padding:8px 16px;flex-shrink:0;">Renew →</a>
+</div>
+<?php endif; ?>
+
 <!-- ════════════════ OVERVIEW ════════════════ -->
 <section id="overview-section">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
@@ -517,9 +568,9 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; -webkit-fon
         <p id="selectedFile" style="margin-top:12px;color:#A5B4FC;font-size:12.5px;font-weight:600;display:none;"></p>
         <input type="file" id="fileInput" accept=".json,.docx,.pdf" style="display:none;" onchange="handleFileSelect(this)">
       </div>
-      <button id="uploadBtn" onclick="uploadFile()" disabled class="btn btn-primary btn-full" style="margin-top:12px;padding:11px;">
+      <button id="uploadBtn" onclick="uploadFile()" disabled class="btn btn-primary btn-full" style="margin-top:12px;padding:11px;<?php echo $plan_expired?'opacity:0.4;cursor:not-allowed;':''; ?>"<?php echo $plan_expired?'disabled':''; ?>>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-        Upload & Train <?php echo htmlspecialchars($active_site['site_name']??$site_id); ?>
+        <?php echo $plan_expired?'Plan Expired - Renew First':'Upload & Train '.htmlspecialchars($active_site['site_name']??$site_id); ?>
       </button>
       <div id="uploadProgress" style="display:none;margin-top:12px;" class="card-inner">
         <div style="padding:14px;">
@@ -689,6 +740,10 @@ body { background: var(--bg); color: var(--text); min-height: 100vh; -webkit-fon
       </div>
       <div class="settings-card-body">
         <div class="info-row"><span class="info-label">Current Plan</span><span class="info-val" style="font-weight:700;"><?php echo strtoupper($plan); ?> — <?php echo $plan_prices[$plan]??''; ?></span></div>
+        <div class="info-row"><span class="info-label">Plan Status</span><span class="info-val" style="font-weight:700;color:<?php echo $plan_expired?'var(--red)':($days_left<=5?'var(--amber)':'var(--green)'); ?>;"><?php echo $plan_expired?'Expired':($days_left<=5?$days_left.' days left':'Active'); ?></span></div>
+        <?php if($plan_expiry_date): ?>
+        <div class="info-row"><span class="info-label">Expiry Date</span><span class="info-val"><?php echo date('d M Y', strtotime($plan_expiry_date)); ?></span></div>
+        <?php endif; ?>
         <div class="info-row"><span class="info-label">Max Sites</span><span class="info-val"><?php echo $max_sites; ?></span></div>
         <div class="info-row"><span class="info-label">Upload Limit</span><span class="info-val"><?php echo $upload_limit; ?> MB per site</span></div>
       </div>
