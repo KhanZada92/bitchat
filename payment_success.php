@@ -3,6 +3,7 @@
 require_once __DIR__ . '/vendor/autoload.php';
 require_once 'config/main_config.php';
 require_once 'config/stripe_config.php';
+require_once 'email_notifications.php';
 
 session_start();
 
@@ -126,6 +127,19 @@ if ($mode === 'sandbox' || strpos($session_id, 'sandbox_') === 0 || strpos($sess
             $_SESSION['max_chatbots']    = $cfg['max_chatbots'];
             $_SESSION['plan_start_date'] = $start_date;
             $_SESSION['plan_expiry_date'] = $expiry_date;
+
+            // Send payment confirmation email
+            $user_stmt = $conn->prepare("SELECT username, email, email_consent, plan FROM users WHERE id = ?");
+            $user_stmt->bind_param("i", $uid);
+            $user_stmt->execute();
+            $user_data = $user_stmt->get_result()->fetch_assoc();
+            $user_stmt->close();
+            
+            if ($user_data) {
+                // Check if this is a renewal (user already had a plan)
+                $is_renewal = !empty($user_data['plan']) && $user_data['plan'] !== 'none';
+                sendPaymentConfirmationEmail($conn, $user_data, $plan, $plan_prices[$plan], $expiry_date, $is_renewal);
+            }
 
             $success = true;
             $mode    = 'live';

@@ -1,5 +1,6 @@
 <?php
 require_once 'config/main_config.php';
+require_once 'email_notifications.php';
 
 // ── Plan ko URL sa capture karo (index.php sa ata hai ?plan=basic etc.) ──
 $selected_plan = '';
@@ -69,6 +70,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['status']    = 'pending';
             $_SESSION['plan']      = null;
             $_SESSION['logged_in'] = true;
+
+            // Send welcome email
+            $welcome_user = [
+                'id' => $new_id,
+                'username' => $username,
+                'email' => $email,
+                'email_consent' => $email_consent
+            ];
+            sendWelcomeEmail($conn, $welcome_user);
 
             // ── Plan ke saath redirect ──
             $redirect = !empty($selected_plan)
