@@ -41,8 +41,8 @@
 
   // If plan expired, restrict access - redirect to renew page
   if ($plan_expired && $_SESSION['role'] !== 'admin') {
-      // Allow viewing dashboard but with restrictions (banners, disabled features)
-      // User can see their data but must renew to use chatbot
+      header('Location: select_plan.php?renew=1');
+      exit();
   }
 
   if ($_SESSION['status'] === 'pending') {

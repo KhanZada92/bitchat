@@ -52,8 +52,74 @@ $plan_colors = [
 // ── SANDBOX MODE ──
 if ($mode === 'sandbox' || strpos($session_id, 'sandbox_') === 0 || strpos($session_id, 'bypass') !== false) {
 
-    $success = true;
-    $mode    = 'sandbox';
+    // In sandbox mode, treat it as a successful payment for testing.
+    // Activate the plan + send the same confirmation email.
+    try {
+        if (empty($plan) || !isset($plan_config[$plan])) {
+            throw new Exception('Invalid or missing plan for sandbox mode.');
+        }
+
+        $uid = $user_id;
+        if (!$uid) {
+            throw new Exception('User not found in session (sandbox mode).');
+        }
+
+        // Read previous plan BEFORE updating user (for correct renewal detection)
+        $prev_plan = null;
+        $prev_stmt = $conn->prepare("SELECT plan FROM users WHERE id = ?");
+        $prev_stmt->bind_param("i", $uid);
+        $prev_stmt->execute();
+        $prev_plan = $prev_stmt->get_result()->fetch_assoc()['plan'] ?? null;
+        $prev_stmt->close();
+
+        $cfg = $plan_config[$plan];
+
+        // Calculate plan expiry (30 days from now)
+        $start_date  = date('Y-m-d H:i:s');
+        $expiry_date = date('Y-m-d H:i:s', strtotime('+30 days'));
+
+        $stmt = $conn->prepare("
+            UPDATE users
+            SET plan=?, upload_limit_mb=?, max_chatbots=?, plan_start_date=?, plan_expiry_date=?
+            WHERE id=?
+        ");
+        $stmt->bind_param(
+            "siissi",
+            $plan,
+            $cfg['upload_limit_mb'],
+            $cfg['max_chatbots'],
+            $start_date,
+            $expiry_date,
+            $uid
+        );
+        $stmt->execute();
+        $stmt->close();
+
+        $_SESSION['plan']             = $plan;
+        $_SESSION['upload_limit_mb']  = $cfg['upload_limit_mb'];
+        $_SESSION['max_chatbots']     = $cfg['max_chatbots'];
+        $_SESSION['plan_start_date']  = $start_date;
+        $_SESSION['plan_expiry_date'] = $expiry_date;
+
+        // Send payment confirmation email
+        $user_stmt = $conn->prepare("SELECT id, username, email, email_consent, plan FROM users WHERE id = ?");
+        $user_stmt->bind_param("i", $uid);
+        $user_stmt->execute();
+        $user_data = $user_stmt->get_result()->fetch_assoc();
+        $user_stmt->close();
+
+        if ($user_data) {
+            $is_renewal = !empty($prev_plan) && $prev_plan !== 'none';
+            sendPaymentConfirmationEmail($conn, $user_data, $plan, $plan_prices[$plan], $expiry_date, $is_renewal);
+        }
+
+        $success = true;
+        $mode    = 'sandbox';
+    } catch (Exception $e) {
+        $error   = 'Sandbox activation error: ' . $e->getMessage();
+        $success = false;
+        $mode    = 'sandbox';
+    }
 
 } else {
 

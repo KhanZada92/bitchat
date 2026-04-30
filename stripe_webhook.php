@@ -5,6 +5,7 @@ define('WEBHOOK_MODE', true);
 // ✅ Pehle main config, phir stripe config — order matter karta hai
 require_once __DIR__ . '/config/main_config.php';
 require_once __DIR__ . '/config/stripe_config.php';
+require_once __DIR__ . '/email_notifications.php';
 
 // Raw payload
 $payload   = file_get_contents('php://input');
@@ -18,6 +19,8 @@ $plan_config = [
     'starter' => ['upload_limit_mb' => 50,  'max_chatbots' => 5],
     'pro'     => ['upload_limit_mb' => 200, 'max_chatbots' => 10],
 ];
+
+$plan_prices = ['basic' => '$10', 'starter' => '$20', 'pro' => '$30'];
 
 // Load Stripe library
 $stripe_lib = false;
@@ -67,6 +70,16 @@ switch ($event->type) {
             $cust_id = $sess->customer           ?? '';
 
             if ($user_id && isset($plan_config[$plan])) {
+                // Read previous plan BEFORE updating user (for correct renewal detection)
+                $prev_plan = null;
+                $prev_stmt = $conn->prepare("SELECT plan FROM users WHERE id = ?");
+                if ($prev_stmt) {
+                    $prev_stmt->bind_param("i", $user_id);
+                    $prev_stmt->execute();
+                    $prev_plan = $prev_stmt->get_result()->fetch_assoc()['plan'] ?? null;
+                    $prev_stmt->close();
+                }
+
                 $cfg = $plan_config[$plan];
                 
                 // Calculate plan expiry (30 days from now)
@@ -77,6 +90,72 @@ switch ($event->type) {
                 $stmt->bind_param("siissssi", $plan, $cfg['upload_limit_mb'], $cfg['max_chatbots'], $cust_id, $sub_id, $start_date, $expiry_date, $user_id);
                 $stmt->execute(); $stmt->close();
                 webhook_log($conn, $event->type, $user_id, $plan, 'activated', $sub_id);
+
+                // Send confirmation email (purchase vs renewal)
+                $u = $conn->prepare("SELECT id, username, email, email_consent, plan FROM users WHERE id = ? LIMIT 1");
+                if ($u) {
+                    $u->bind_param("i", $user_id);
+                    $u->execute();
+                    $user_data = $u->get_result()->fetch_assoc();
+                    $u->close();
+                    if ($user_data) {
+                        $is_renewal = !empty($prev_plan) && $prev_plan !== 'none';
+                        sendPaymentConfirmationEmail($conn, $user_data, $plan, $plan_prices[$plan] ?? '', $expiry_date, $is_renewal);
+                    }
+                }
+            }
+        }
+        break;
+
+    case 'invoice.payment_succeeded':
+        // Renewal payments are best detected on invoice success.
+        $invoice = $event->data->object;
+        $cust_id = $invoice->customer     ?? '';
+        $sub_id  = $invoice->subscription ?? '';
+
+        if ($cust_id) {
+            $stmt = $conn->prepare("SELECT id, username, email, email_consent, plan, plan_expiry_date FROM users WHERE stripe_customer_id = ? LIMIT 1");
+            if ($stmt) {
+                $stmt->bind_param("s", $cust_id);
+                $stmt->execute();
+                $user = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+
+                if ($user && !empty($user['plan']) && isset($plan_config[$user['plan']])) {
+                    $plan = $user['plan'];
+                    $cfg  = $plan_config[$plan];
+
+                    $now = new DateTime();
+                    $now->setTime(0, 0, 0);
+                    $base = clone $now;
+                    if (!empty($user['plan_expiry_date'])) {
+                        try {
+                            $currentExpiry = new DateTime($user['plan_expiry_date']);
+                            $currentExpiry->setTime(0, 0, 0);
+                            if ($currentExpiry > $base) {
+                                $base = $currentExpiry;
+                            }
+                        } catch (Exception $e) {
+                            // ignore parse issues, fallback to now
+                        }
+                    }
+
+                    $base->modify('+30 days');
+                    $new_expiry_date = $base->format('Y-m-d H:i:s');
+                    $start_date      = date('Y-m-d H:i:s');
+
+                    $upd = $conn->prepare("UPDATE users SET upload_limit_mb=?, max_chatbots=?, stripe_subscription_id=?, plan_start_date=?, plan_expiry_date=? WHERE id=?");
+                    if ($upd) {
+                        $upd->bind_param("iisssi", $cfg['upload_limit_mb'], $cfg['max_chatbots'], $sub_id, $start_date, $new_expiry_date, $user['id']);
+                        $upd->execute();
+                        $upd->close();
+                    }
+
+                    webhook_log($conn, $event->type, $user['id'], $plan, 'renewed', $sub_id);
+
+                    // Send renewal confirmation email
+                    sendPaymentConfirmationEmail($conn, $user, $plan, $plan_prices[$plan] ?? '', $new_expiry_date, true);
+                }
             }
         }
         break;

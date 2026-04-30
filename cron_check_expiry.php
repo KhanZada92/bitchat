@@ -51,8 +51,8 @@ while ($user = $result->fetch_assoc()) {
             echo "  ✓ Expired email sent\n";
         }
         
-    } elseif ($days_left <= 3 && $days_left >= 2) {
-        // 2-3 days before expiry
+    } elseif ($days_left === 3) {
+        // 3 days before expiry
         echo "REMINDER: {$user['username']} ({$user['email']}) - {$days_left} days left\n";
         
         // Send reminder
