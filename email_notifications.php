@@ -40,6 +40,7 @@ function sendEmail($to, $subject, $message, $headers = '') {
  * Send email via SMTP using PHPMailer
  */
 function sendEmailViaSMTP($to, $subject, $message) {
+    $mail = null;
     try {
         $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
         
@@ -50,7 +51,16 @@ function sendEmailViaSMTP($to, $subject, $message) {
         $mail->Username   = getenv('SMTP_USERNAME') ?: 'noreply@bitchatbot.io';
         $mail->Password   = getenv('SMTP_PASSWORD') ?: '';
         $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = getenv('SMTP_PORT') ?: 587;
+        $mail->Port       = (int)(getenv('SMTP_PORT') ?: 587);
+
+        // Optional debugging (set SMTP_DEBUG=2 in env to enable)
+        $debug = (int)(getenv('SMTP_DEBUG') ?: 0);
+        if ($debug > 0) {
+            $mail->SMTPDebug = $debug;
+            $mail->Debugoutput = function ($str, $level) {
+                error_log("SMTP[{$level}]: " . $str);
+            };
+        }
         
         // Sender
         $from_email = getenv('SMTP_FROM_EMAIL') ?: 'noreply@bitchatbot.io';
@@ -70,9 +80,41 @@ function sendEmailViaSMTP($to, $subject, $message) {
         return true;
         
     } catch (\Exception $e) {
-        error_log("Email sending failed: {$mail->ErrorInfo}");
+        $err = $mail ? $mail->ErrorInfo : '';
+        error_log("Email sending failed: " . $e->getMessage() . ($err ? " | " . $err : ""));
         return false;
     }
+}
+
+/**
+ * Send login notification (once per day max)
+ */
+function sendLoginEmail($conn, $user) {
+    if (!isset($user['email_consent']) || (int)$user['email_consent'] !== 1) return false;
+    if (hasEmailSentToday($conn, $user['id'], 'login')) return false;
+
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+
+    $subject = "🔐 New login to your Bitchatbot account";
+    $message = "
+    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+        <h2 style='color: #6C47FF;'>New Login Detected</h2>
+        <p>Hi <strong>{$user['username']}</strong>,</p>
+        <p>We noticed a login to your Bitchatbot account.</p>
+        <div style='background:#F3F4F6;padding:14px 16px;border-radius:10px;margin:18px 0;'>
+            <p style='margin:0;color:#111827;'><strong>IP:</strong> {$ip}</p>
+            <p style='margin:8px 0 0 0;color:#111827;'><strong>Device:</strong> " . htmlspecialchars($ua, ENT_QUOTES) . "</p>
+            <p style='margin:8px 0 0 0;color:#111827;'><strong>Time:</strong> " . date('Y-m-d H:i:s') . "</p>
+        </div>
+        <p style='color:#6B7280;font-size:14px;'>If this wasn't you, please reset your password immediately.</p>
+        <hr style='border:none;border-top:1px solid #E5E7EB;margin:20px 0;'>
+        <p style='color:#9CA3AF;font-size:12px;'>Bitchatbot · <a href='https://bitchatbot.io' style='color:#6C47FF;text-decoration:none;'>bitchatbot.io</a></p>
+    </div>";
+
+    $sent = sendEmail($user['email'], $subject, $message);
+    logEmail($conn, $user['id'], 'login', $sent ? 'sent' : 'failed');
+    return $sent;
 }
 
 /**
@@ -102,9 +144,9 @@ function hasEmailSentToday($conn, $user_id, $email_type) {
  */
 function sendExpiryReminder($conn, $user, $days_left) {
     if ($user['email_consent'] != 1) return false;
-    if (hasEmailSentToday($conn, $user['id'], "reminder_{$days_left}_days")) return false;
     
     $email_type = $days_left <= 2 ? 'reminder_2_days' : 'reminder_3_days';
+    if (hasEmailSentToday($conn, $user['id'], $email_type)) return false;
     
     $subject = "⚠️ Your Bitchatbot Plan Expires in {$days_left} Days";
     $message = "

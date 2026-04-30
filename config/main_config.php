@@ -1,9 +1,59 @@
 <?php
 
-$lines = file(__DIR__ . '/.env');
-foreach ($lines as $line) {
-    putenv(trim($line));
+/**
+ * Load environment variables from a .env file.
+ *
+ * Notes:
+ * - Ignores blank lines and comments (# or ;)
+ * - Only processes KEY=VALUE lines
+ * - Strips surrounding single/double quotes from VALUE
+ * - Never throws warnings if the file is missing or has invalid lines
+ */
+function loadEnvFile(string $envPath): void {
+    if (!is_file($envPath) || !is_readable($envPath)) {
+        return;
+    }
+
+    $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (!is_array($lines)) {
+        return;
+    }
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || $line[0] === ';') {
+            continue;
+        }
+
+        // Remove inline comments: KEY=VALUE # comment
+        // (only when the # is preceded by whitespace)
+        $line = preg_replace('/\s+#.*$/', '', $line);
+
+        if (strpos($line, '=') === false) {
+            continue;
+        }
+
+        [$key, $value] = array_map('trim', explode('=', $line, 2));
+        if ($key === '') {
+            continue;
+        }
+
+        if ($value !== '') {
+            $first = $value[0];
+            $last = $value[strlen($value) - 1];
+            if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
+                $value = substr($value, 1, -1);
+            }
+        }
+
+        putenv($key . '=' . $value);
+        $_ENV[$key] = $value;
+    }
 }
+
+// Support both repo-root `.env` and `config/.env`
+loadEnvFile(dirname(__DIR__) . '/.env');
+loadEnvFile(__DIR__ . '/.env');
 
 /**
  * BitChat Unified Configuration

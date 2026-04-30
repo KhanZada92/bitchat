@@ -1,6 +1,5 @@
 <?php
 
-require_once __DIR__ . '/vendor/autoload.php';
 require_once 'config/main_config.php';
 require_once 'config/stripe_config.php';
 require_once 'email_notifications.php';
@@ -93,6 +92,14 @@ if ($mode === 'sandbox' || strpos($session_id, 'sandbox_') === 0 || strpos($sess
                 throw new Exception('User not found in session.');
             }
 
+            // Read previous plan BEFORE updating user (for correct renewal detection)
+            $prev_plan = null;
+            $prev_stmt = $conn->prepare("SELECT plan FROM users WHERE id = ?");
+            $prev_stmt->bind_param("i", $uid);
+            $prev_stmt->execute();
+            $prev_plan = $prev_stmt->get_result()->fetch_assoc()['plan'] ?? null;
+            $prev_stmt->close();
+
             $cfg     = $plan_config[$plan];
             $sub_id  = $sess->subscription ?? '';
             $cust_id = $sess->customer ?? '';
@@ -137,7 +144,7 @@ if ($mode === 'sandbox' || strpos($session_id, 'sandbox_') === 0 || strpos($sess
             
             if ($user_data) {
                 // Check if this is a renewal (user already had a plan)
-                $is_renewal = !empty($user_data['plan']) && $user_data['plan'] !== 'none';
+                $is_renewal = !empty($prev_plan) && $prev_plan !== 'none';
                 sendPaymentConfirmationEmail($conn, $user_data, $plan, $plan_prices[$plan], $expiry_date, $is_renewal);
             }
 

@@ -1,5 +1,6 @@
 <?php
 require_once 'config/main_config.php';
+require_once 'email_notifications.php';
 
 // Already logged in
 if (isset($_SESSION['user_id'])) {
@@ -20,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($password)) $errors[] = "Password is required";
 
     if (empty($errors)) {
-        $stmt = $conn->prepare("SELECT id, username, email, password, site_id, role, status, plan FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT id, username, email, password, site_id, role, status, plan, email_consent FROM users WHERE email = ?");
         $stmt->bind_param("s", $email); $stmt->execute();
         $result = $stmt->get_result();
 
@@ -39,6 +40,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Update last_login
                 $conn->query("UPDATE users SET last_login=NOW() WHERE id=".$user['id']);
+
+                // Send login email (non-blocking)
+                try {
+                    $login_user = [
+                        'id' => $user['id'],
+                        'username' => $user['username'],
+                        'email' => $user['email'],
+                        'email_consent' => $user['email_consent'] ?? 0,
+                    ];
+                    sendLoginEmail($conn, $login_user);
+                } catch (Throwable $e) {
+                    // Never break login flow if email fails
+                    error_log("Login email failed: " . $e->getMessage());
+                }
 
                 if ($user['role'] === 'admin') {
                     header('Location: admin.php'); exit();
