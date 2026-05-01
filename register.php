@@ -88,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             unset($_SESSION['selected_plan']); // clean up
             header('Location: ' . $redirect); exit();
         } else {
+            error_log("Registration failed: " . $stmt->error);
             $errors[] = "Registration failed. Please try again.";
         }
         $stmt->close();

@@ -15,7 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $body = json_decode(file_get_contents('php://input'), true);
-$code = strtoupper(trim($body['coupon_code'] ?? ''));
+$body = is_array($body) ? $body : [];
+
+// Support both JSON and form POST (fallback)
+$raw_code = $body['coupon_code'] ?? ($_POST['coupon_code'] ?? '');
+$code = strtoupper(trim((string)$raw_code));
 $user_id = $_SESSION['user_id'];
 
 if (empty($code)) {

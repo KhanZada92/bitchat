@@ -80,6 +80,50 @@ body::before {
 }
 .nav-links a:hover { color: white; }
 .nav-actions { display: flex; align-items: center; gap: 10px; }
+.nav-menu-btn{
+  display:none;
+  width:38px;height:38px;
+  border-radius:10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: white;
+  cursor:pointer;
+  align-items:center;
+  justify-content:center;
+}
+.nav-menu-btn:hover{ background: rgba(255,255,255,0.07); }
+
+/* Mobile menu */
+.mnav{
+  display:none;
+  position: fixed;
+  top: 66px;
+  left: 0;
+  right: 0;
+  z-index: 99;
+  background: rgba(4,5,13,0.92);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-bottom: 1px solid var(--border);
+}
+.mnav.open{ display:block; }
+.mnav-inner{
+  max-width:1180px;
+  margin:0 auto;
+  padding: 14px 18px 18px;
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+}
+.mnav a{
+  color: var(--text-dim);
+  text-decoration:none;
+  font-weight:600;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.mnav a:hover{ color:white; background: rgba(255,255,255,0.05); }
 .btn-ghost {
   font-size: 13.5px; font-weight: 600; color: var(--text-dim);
   text-decoration: none; padding: 7px 15px; border-radius: 8px; transition: all 0.2s;
@@ -396,6 +440,7 @@ body::before {
 }
 @media(max-width:600px){
   .nav-links{display:none}
+  .nav-menu-btn{display:flex}
   .hero-h1{font-size:42px}
   .stats-bar{flex-direction:column}
   .stat-item{border-right:none;border-bottom:1px solid var(--border)}
@@ -429,6 +474,11 @@ body::before {
       <a href="privacy.php">Privacy</a>
     </div>
     <div class="nav-actions">
+      <button class="nav-menu-btn" id="navMenuBtn" aria-label="Open menu" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/>
+        </svg>
+      </button>
       <?php if (isset($_SESSION['user_id'])): ?>
         <a href="dashboard.php" class="btn-ghost">Dashboard</a>
         <a href="logout.php" class="btn-primary" style="background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.2);color:#F87171;">Logout</a>
@@ -439,6 +489,18 @@ body::before {
     </div>
   </div>
 </nav>
+
+<!-- Mobile Nav -->
+<div class="mnav" id="mnav">
+  <div class="mnav-inner">
+    <a href="#features" onclick="closeMNav()">Features</a>
+    <a href="#how-it-works" onclick="closeMNav()">How It Works</a>
+    <a href="#pricing" onclick="closeMNav()">Pricing</a>
+    <a href="about.php" onclick="closeMNav()">About</a>
+    <a href="#faq" onclick="closeMNav()">FAQ</a>
+    <a href="privacy.php" onclick="closeMNav()">Privacy</a>
+  </div>
+</div>
 
 <!-- ══ HERO ══ -->
 <section class="hero-section" style="position:relative;z-index:1;">
@@ -761,6 +823,20 @@ body::before {
 </div>
 <script>
 var bcOpen=false,BC_SITE_ID='<?= addslashes($site_id) ?>';
+(function(){
+  var btn=document.getElementById('navMenuBtn');
+  var m=document.getElementById('mnav');
+  if(!btn||!m) return;
+  function toggle(){ m.classList.toggle('open'); }
+  window.closeMNav=function(){ m.classList.remove('open'); };
+  btn.addEventListener('click', toggle);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') window.closeMNav(); });
+  document.addEventListener('click', function(e){
+    if(!m.classList.contains('open')) return;
+    if(e.target===btn || btn.contains(e.target) || m.contains(e.target)) return;
+    window.closeMNav();
+  });
+})();
 (function(){if(!BC_SITE_ID)return;fetch('https://bitchatbot.io/get_chatbot_settings.php?site='+encodeURIComponent(BC_SITE_ID)).then(r=>r.json()).then(s=>{var name=(s.chatbot_name&&s.chatbot_name.trim())?s.chatbot_name:'Bitchat';var color=(s.primary_color&&s.primary_color.trim())?s.primary_color:'#5B5EF4';var label=document.getElementById('bc-btn-label');if(label)label.textContent=name;var btn=document.getElementById('bc-toggle-btn');if(btn){btn.style.background=color;btn.style.boxShadow='0 6px 24px '+color+'55';}}).catch(()=>{});})();
 function bcWidgetToggle(){bcOpen=!bcOpen;var wrap=document.getElementById('bc-frame-wrap'),chatIco=document.getElementById('bc-ico-chat'),closeIco=document.getElementById('bc-ico-close'),label=document.getElementById('bc-btn-label'),btn=document.getElementById('bc-toggle-btn');if(bcOpen){wrap.style.display='block';setTimeout(()=>{wrap.style.transform='scale(1) translateY(0)';wrap.style.opacity='1';},10);chatIco.style.display='none';closeIco.style.display='block';label.style.display='none';btn.style.padding='0 13px';btn.style.borderRadius='50%';btn.style.width='50px';btn.style.gap='0';}else{wrap.style.transform='scale(0.88) translateY(12px)';wrap.style.opacity='0';setTimeout(()=>{wrap.style.display='none';},320);chatIco.style.display='block';closeIco.style.display='none';label.style.display='inline';btn.style.padding='0 18px 0 13px';btn.style.borderRadius='50px';btn.style.width='auto';btn.style.gap='9px';}}
 function toggleFaq(btn){var answer=btn.nextElementSibling,icon=btn.querySelector('.faq-icon'),isOpen=answer.classList.contains('open');document.querySelectorAll('.faq-a').forEach(el=>el.classList.remove('open'));document.querySelectorAll('.faq-icon').forEach(el=>{el.classList.remove('open');el.textContent='+';});if(!isOpen){answer.classList.add('open');icon.classList.add('open');icon.textContent='+';}}
