@@ -24,7 +24,7 @@ if (!empty($_SESSION['coupon_expires_at']) && strtotime($_SESSION['coupon_expire
 }
 
 if ($has_plan && !isset($_GET['upgrade']) && $current_plan !== 'none') {
-    header('Location: dashboard.php'); exit();
+    header('Location: /dashboard.php'); exit();
 }
 
 $cancelled = isset($_GET['cancelled']);
@@ -364,7 +364,7 @@ nav {
 <body>
 
 <nav>
-    <a href="<?php echo $has_plan ? 'dashboard.php' : '#'; ?>" class="logo">
+    <a href="<?php echo $has_plan ? '/dashboard.php' : '#'; ?>" class="logo">
         <div class="logo-mark">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
@@ -577,7 +577,7 @@ function applyCoupon() {
     btn.innerHTML = '<span class="sp-sm"></span>';
     msg.innerHTML = '<p style="color:var(--muted);font-size:13px;text-align:center;margin-bottom:12px;">Checking...</p>';
 
-    fetch('apply_coupon_ajax.php', {
+    fetch('/apply_coupon_ajax.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ coupon_code: code })
@@ -587,7 +587,7 @@ function applyCoupon() {
         btn.disabled = false; btn.textContent = 'Apply';
         if (data.success) {
             msg.innerHTML = '<div class="ms">🎉 ' + data.message + '</div>';
-            setTimeout(() => { window.location.href = 'dashboard.php'; }, 1600);
+            setTimeout(() => { window.location.href = '/dashboard.php'; }, 1600);
         } else {
             msg.innerHTML = '<div class="me">❌ ' + data.error + '</div>';
         }
