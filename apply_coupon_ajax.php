@@ -10,15 +10,15 @@ header('Content-Type: application/json');
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'error' => 'Please login first.']); exit();
 }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['success' => false, 'error' => 'Invalid request.']); exit();
+if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'GET'], true)) {
+    echo json_encode(['success' => false, 'error' => 'Invalid request method.']); exit();
 }
 
 $body = json_decode(file_get_contents('php://input'), true);
 $body = is_array($body) ? $body : [];
 
 // Support both JSON and form POST (fallback)
-$raw_code = $body['coupon_code'] ?? ($_POST['coupon_code'] ?? '');
+$raw_code = $body['coupon_code'] ?? ($_POST['coupon_code'] ?? ($_GET['coupon_code'] ?? ''));
 $code = strtoupper(trim((string)$raw_code));
 $user_id = $_SESSION['user_id'];
 
@@ -34,7 +34,8 @@ $stmt = $conn->prepare("
       AND used_count < max_uses
       AND (expires_at IS NULL OR expires_at > NOW())
 ");
-$stmt->bind_param("s", $code); $stmt->execute();
+$stmt->bind_param("s", $code);
+$stmt->execute();
 $cpn = $stmt->get_result()->fetch_assoc(); $stmt->close();
 
 if (!$cpn) {
@@ -45,8 +46,23 @@ if (!$cpn) {
 $start_date = date('Y-m-d H:i:s');
 $exp = date('Y-m-d H:i:s', strtotime('+' . $cpn['duration_days'] . ' days'));
 $upd = $conn->prepare("UPDATE users SET plan=?, upload_limit_mb=?, max_chatbots=1, coupon_code=?, coupon_expires_at=?, plan_start_date=?, plan_expiry_date=? WHERE id=?");
-$upd->bind_param("sississi", $cpn['plan'], $cpn['upload_limit_mb'], $code, $exp, $start_date, $exp, $user_id);
-$upd->execute(); $upd->close();
+if (!$upd) {
+    error_log("Coupon apply prepare failed: " . $conn->error);
+    echo json_encode(['success' => false, 'error' => 'Server error. Please try again.']); exit();
+}
+
+// Placeholders: plan, upload_limit_mb, coupon_code, coupon_expires_at, plan_start_date, plan_expiry_date, id
+// Types:        s,    i,             s,          s,               s,              s,               i
+$ok = $upd->bind_param("sissssi", $cpn['plan'], $cpn['upload_limit_mb'], $code, $exp, $start_date, $exp, $user_id);
+if (!$ok) {
+    error_log("Coupon apply bind_param failed: " . $upd->error);
+    echo json_encode(['success' => false, 'error' => 'Server error. Please try again.']); exit();
+}
+if (!$upd->execute()) {
+    error_log("Coupon apply execute failed: " . $upd->error);
+    echo json_encode(['success' => false, 'error' => 'Could not apply coupon.']); exit();
+}
+$upd->close();
 
 // Increment usage
 $conn->query("UPDATE coupons SET used_count = used_count + 1 WHERE id = " . intval($cpn['id']));
