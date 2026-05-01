@@ -1,5 +1,6 @@
 <?php
 require_once 'config/main_config.php';
+require_once 'email_notifications.php';
 
 // Already logged in
 if (isset($_SESSION['user_id'])) {
@@ -20,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($password)) $errors[] = "Password is required";
 
     if (empty($errors)) {
-        $stmt = $conn->prepare("SELECT id, username, email, password, site_id, role, status, plan FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT id, username, email, password, site_id, role, status, plan, email_consent FROM users WHERE email = ?");
         $stmt->bind_param("s", $email); $stmt->execute();
         $result = $stmt->get_result();
 
@@ -40,11 +41,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Update last_login
                 $conn->query("UPDATE users SET last_login=NOW() WHERE id=".$user['id']);
 
+                // Send login email (non-blocking)
+                try {
+                    $login_user = [
+                        'id' => $user['id'],
+                        'username' => $user['username'],
+                        'email' => $user['email'],
+                        'email_consent' => $user['email_consent'] ?? 0,
+                    ];
+                    sendLoginEmail($conn, $login_user);
+                } catch (Throwable $e) {
+                    // Never break login flow if email fails
+                    error_log("Login email failed: " . $e->getMessage());
+                }
+
                 if ($user['role'] === 'admin') {
                     header('Location: admin.php'); exit();
                 }
-                // No plan → select plan
+                
+                // Check plan status
                 $has_plan = !empty($user['plan']) && $user['plan'] !== 'none';
+                
+                if ($has_plan) {
+                    // Check if plan is expired
+                    $stmt_exp = $conn->prepare("SELECT plan_expiry_date FROM users WHERE id = ?");
+                    $stmt_exp->bind_param("i", $user['id']);
+                    $stmt_exp->execute();
+                    $exp_result = $stmt_exp->get_result()->fetch_assoc();
+                    $stmt_exp->close();
+                    
+                    $plan_expired = false;
+                    if ($exp_result && !empty($exp_result['plan_expiry_date'])) {
+                        $expiry_date = new DateTime($exp_result['plan_expiry_date']);
+                        $today = new DateTime();
+                        $today->setTime(0, 0, 0);
+                        
+                        if ($expiry_date < $today) {
+                            $plan_expired = true;
+                        }
+                    }
+                    
+                    // If plan expired, redirect to select_plan with renew flag
+                    if ($plan_expired) {
+                        header('Location: select_plan.php?renew=1'); exit();
+                    }
+                }
+                
                 header('Location: ' . ($has_plan ? 'dashboard.php' : 'select_plan.php')); exit();
             } else {
                 $errors[] = "Incorrect email or password";
@@ -61,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login — Bitchat</title>
+<title>Login — Bitchatbot</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -85,7 +127,7 @@ label { display:block; font-size:13px; font-weight:600; color:#9CA3AF; margin-bo
             <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
         </div>
         <h1 style="font-size:26px;font-weight:800;color:white;margin-bottom:6px;">Welcome back</h1>
-        <p style="font-size:14px;color:#6B7280;">Login to your Bitchat account</p>
+        <p style="font-size:14px;color:#6B7280;">Login to your Bitchatbot account</p>
     </div>
 
     <!-- Card -->

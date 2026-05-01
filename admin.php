@@ -75,16 +75,47 @@ $active_tab = $_GET['tab'] ?? 'users';
 // ============ MAIN DATA ============
 $clients_res = $conn->query("
     SELECT u.id, u.username, u.email, u.site_id, u.status, u.plan, u.max_chatbots,
-           u.created_at, u.website_url, u.coupon_expires_at, u.upload_limit_mb
+           u.created_at, u.website_url, u.coupon_expires_at, u.upload_limit_mb,
+           u.plan_start_date, u.plan_expiry_date, u.email_consent,
+           u.stripe_subscription_id
     FROM users u
     WHERE u.role = 'client'
     ORDER BY u.created_at DESC
 ");
 $clients = $clients_res ? $clients_res->fetch_all(MYSQLI_ASSOC) : [];
 
+// Calculate expiry status for each user
+foreach ($clients as &$c) {
+    $c['plan_status'] = 'no_plan';
+    $c['days_left'] = 999;
+    
+    if (!empty($c['plan_expiry_date']) && !empty($c['plan']) && $c['plan'] !== 'none') {
+        $expiry = new DateTime($c['plan_expiry_date']);
+        $today = new DateTime();
+        $today->setTime(0, 0, 0);
+        
+        if ($expiry < $today) {
+            $c['plan_status'] = 'expired';
+            $c['days_left'] = 0;
+        } else {
+            $diff = $today->diff($expiry);
+            $c['days_left'] = $diff->days;
+            
+            if ($c['days_left'] <= 3) {
+                $c['plan_status'] = 'expiring_soon';
+            } else {
+                $c['plan_status'] = 'active';
+            }
+        }
+    }
+}
+unset($c);
+
 $total    = count($clients);
 $active_u = count(array_filter($clients, fn($c) => $c['status']==='approved'));
 $banned_u = count(array_filter($clients, fn($c) => $c['status']==='banned'));
+$expired_users = count(array_filter($clients, fn($c) => $c['plan_status']==='expired'));
+$expiring_users = count(array_filter($clients, fn($c) => $c['plan_status']==='expiring_soon'));
 
 // ── Per-user SITES data (all sites) ──
 $all_user_sites = [];
@@ -276,6 +307,9 @@ tr.client-row:hover td { background:rgba(255,255,255,0.02); }
             <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Total Sites</span><span style="font-size:14px;font-weight:800;color:#67E8F9;"><?php echo $total_sites; ?></span></div>
             <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Messages</span><span style="font-size:14px;font-weight:800;color:#67E8F9;"><?php echo $total_all_chats; ?></span></div>
             <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Sessions</span><span style="font-size:14px;font-weight:800;color:#A78BFA;"><?php echo $total_all_sessions; ?></span></div>
+            <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
+            <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Plans Expired</span><span style="font-size:14px;font-weight:800;color:#F87171;"><?php echo $expired_users; ?></span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--muted);">Expiring Soon</span><span style="font-size:14px;font-weight:800;color:#FBBF24;"><?php echo $expiring_users; ?></span></div>
         </div>
     </div>
 
@@ -317,6 +351,8 @@ if($active_tab==='users'): ?>
         <thead><tr>
             <th style="text-align:left;">Client</th>
             <th style="text-align:left;">Plan</th>
+            <th style="text-align:left;">Plan Status</th>
+            <th style="text-align:left;">Expiry Date</th>
             <th style="text-align:left;">Sites</th>
             <th style="text-align:left;">Chats</th>
             <th style="text-align:left;">Status</th>
@@ -325,7 +361,7 @@ if($active_tab==='users'): ?>
         </tr></thead>
         <tbody>
         <?php if(empty($clients)): ?>
-        <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);">No clients yet.</td></tr>
+        <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted);">No clients yet.</td></tr>
         <?php endif; ?>
         <?php foreach($clients as $c):
             $uid       = $c['id'];
@@ -349,6 +385,25 @@ if($active_tab==='users'): ?>
                 <?php if(!empty($c['coupon_expires_at'])&&strtotime($c['coupon_expires_at'])>time()):?>
                 <span style="font-size:10px;color:#10B981;display:block;margin-top:3px;">🎟️ Exp <?php echo date('d M',strtotime($c['coupon_expires_at'])); ?></span>
                 <?php endif;?>
+            </td>
+            <td>
+                <?php if($c['plan_status'] === 'expired'): ?>
+                <span class="tag" style="background:rgba(239,68,68,0.12);color:#F87171;">❌ Expired</span>
+                <?php elseif($c['plan_status'] === 'expiring_soon'): ?>
+                <span class="tag" style="background:rgba(251,191,36,0.12);color:#FBBF24;">⚠️ <?php echo $c['days_left']; ?> days left</span>
+                <?php elseif($c['plan_status'] === 'active'): ?>
+                <span class="tag" style="background:rgba(16,185,129,0.12);color:#6EE7B7;">✓ <?php echo $c['days_left']; ?> days</span>
+                <?php else: ?>
+                <span class="tag" style="background:rgba(107,114,128,0.12);color:#9CA3AF;">No Plan</span>
+                <?php endif; ?>
+            </td>
+            <td>
+                <?php if(!empty($c['plan_expiry_date'])): ?>
+                <div style="font-size:12.5px;color:white;font-weight:600;"><?php echo date('d M Y', strtotime($c['plan_expiry_date'])); ?></div>
+                <div style="font-size:10.5px;color:var(--muted);margin-top:2px;"><?php echo date('h:i A', strtotime($c['plan_expiry_date'])); ?></div>
+                <?php else: ?>
+                <span style="font-size:11.5px;color:var(--muted);">—</span>
+                <?php endif; ?>
             </td>
             <td>
                 <?php if(empty($usites)): ?>

@@ -38,6 +38,36 @@ if (!$site_row) { echo json_encode($default); exit(); }
 $user_id = $site_row['user_id'];
 $plan    = $site_row['plan'] ?? 'basic';
 
+// 3. Check plan expiry
+$plan_expired = false;
+$stmt_exp = $conn->prepare("SELECT plan_expiry_date FROM users WHERE id = ?");
+$stmt_exp->bind_param("i", $user_id);
+$stmt_exp->execute();
+$exp_row = $stmt_exp->get_result()->fetch_assoc();
+$stmt_exp->close();
+
+if ($exp_row && !empty($exp_row['plan_expiry_date'])) {
+    $expiry_date = new DateTime($exp_row['plan_expiry_date']);
+    $today = new DateTime();
+    $today->setTime(0, 0, 0);
+    
+    if ($expiry_date < $today) {
+        $plan_expired = true;
+    }
+}
+
+// If plan expired, return disabled status
+if ($plan_expired) {
+    echo json_encode([
+        'chatbot_name'  => 'Plan Expired',
+        'primary_color' => '#EF4444',
+        'greeting_msg'  => 'Your plan has expired. Please renew your plan to continue using the chatbot.',
+        'website_url'   => '',
+        'plan_expired'  => true
+    ]);
+    exit();
+}
+
 // 2. Per-site customization — STRICT site_id match only.
 // NO fallback to other sites — prevents one site's settings bleeding into others.
 $custom = null;
@@ -63,4 +93,5 @@ echo json_encode([
     'primary_color' => (!empty($custom['primary_color'])) ? $custom['primary_color'] : $default['primary_color'],
     'greeting_msg'  => (!empty($custom['greeting_msg']))  ? $custom['greeting_msg']  : $default['greeting_msg'],
     'website_url'   => $site_row['website_url'] ?? '',
+    'plan_expired'  => false
 ]);

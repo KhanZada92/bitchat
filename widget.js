@@ -25,6 +25,7 @@
   let CHAT_GREETING = 'Hi! How can I assist you today?';
   let hasGreeted    = false;
   let isOpen        = false;
+  let isPlanExpired = false;
 
   // ── Fetch settings & enforce domain restriction ──
   fetch(SETTINGS_URL + encodeURIComponent(SITE_ID))
@@ -53,6 +54,12 @@
       var name     = (s.chatbot_name  && s.chatbot_name.trim())  ? s.chatbot_name  : CHAT_NAME;
       var color    = (s.primary_color && s.primary_color.trim()) ? s.primary_color : CHAT_COLOR;
       var greeting = (s.greeting_msg  && s.greeting_msg.trim())  ? s.greeting_msg  : CHAT_GREETING;
+
+      // Check if plan is expired
+      if (s.plan_expired === true) {
+        isPlanExpired = true;
+        console.warn('[BitChat] Plan has expired for site ' + SITE_ID);
+      }
 
       CHAT_NAME     = name;
       CHAT_COLOR    = color;
@@ -271,6 +278,12 @@
     document.getElementById('bc-close-' + SITE_ID).addEventListener('click', closeChat);
 
     async function sendMessage() {
+      // Check if plan is expired
+      if (isPlanExpired) {
+        addMsg('bot', 'Your plan has expired. Please renew your plan at bitchatbot.io to continue using the chatbot.');
+        return;
+      }
+
       var msg = inputEl.value.trim();
       if (!msg) return;
       addMsg('user', msg);

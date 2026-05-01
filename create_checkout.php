@@ -93,13 +93,19 @@ try {
         ][$plan];
 
         $user_id = $_SESSION['user_id'];
+        
+        // Calculate plan expiry (30 days from now)
+        $start_date = date('Y-m-d H:i:s');
+        $expiry_date = date('Y-m-d H:i:s', strtotime('+30 days'));
 
-        $stmt = $conn->prepare("UPDATE users SET plan=?, upload_limit_mb=?, max_chatbots=? WHERE id=?");
-        $stmt->bind_param("siii", $plan, $cfg['upload_limit_mb'], $cfg['max_chatbots'], $user_id);
+        $stmt = $conn->prepare("UPDATE users SET plan=?, upload_limit_mb=?, max_chatbots=?, plan_start_date=?, plan_expiry_date=? WHERE id=?");
+        $stmt->bind_param("siiiss", $plan, $cfg['upload_limit_mb'], $cfg['max_chatbots'], $start_date, $expiry_date, $user_id);
         $stmt->execute();
         $stmt->close();
 
         $_SESSION['plan'] = $plan;
+        $_SESSION['plan_start_date'] = $start_date;
+        $_SESSION['plan_expiry_date'] = $expiry_date;
 
         $sandbox_session = 'sandbox_' . bin2hex(random_bytes(10));
 

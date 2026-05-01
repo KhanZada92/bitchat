@@ -1,0 +1,14 @@
+{
+  "name": "bitchat/bitchatbot",
+  "description": "Bitchatbot PHP app (SMTP + Stripe)",
+  "type": "project",
+  "require": {
+    "php": ">=7.4",
+    "phpmailer/phpmailer": "^6.9",
+    "stripe/stripe-php": "^16.0"
+  },
+  "autoload": {
+    "classmap": []
+  }
+}
+

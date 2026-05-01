@@ -1,5 +1,6 @@
 <?php
 require_once 'config/main_config.php';
+require_once 'email_notifications.php';
 
 // ── Plan ko URL sa capture karo (index.php sa ata hai ?plan=basic etc.) ──
 $selected_plan = '';
@@ -31,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email            = trim($_POST['email'] ?? '');
     $password         = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
+    $email_consent    = isset($_POST['email_consent']) ? 1 : 0;
     // POST sa bhi plan lo (hidden field se)
     $post_plan = $_POST['selected_plan'] ?? '';
     if (in_array($post_plan, $allowed_plans)) {
@@ -42,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Valid email required";
     if (empty($password) || strlen($password) < 6) $errors[] = "Password must be at least 6 characters";
     if ($password !== $confirm_password) $errors[] = "Passwords do not match";
+    if (!isset($_POST['email_consent'])) $errors[] = "You must agree to receive email notifications";
 
     if (empty($errors)) {
         $stmt = $conn->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
@@ -52,8 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($errors)) {
         $hashed = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, status, plan) VALUES (?, ?, ?, 'client', 'pending', NULL)");
-        $stmt->bind_param("sss", $username, $email, $hashed);
+        $stmt = $conn->prepare("INSERT INTO users (username, email, password, role, status, plan, email_consent) VALUES (?, ?, ?, 'client', 'pending', NULL, ?)");
+        $stmt->bind_param("sssi", $username, $email, $hashed, $email_consent);
 
         if ($stmt->execute()) {
             $new_id = $conn->insert_id;
@@ -67,6 +70,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['status']    = 'pending';
             $_SESSION['plan']      = null;
             $_SESSION['logged_in'] = true;
+
+            // Send welcome email
+            $welcome_user = [
+                'id' => $new_id,
+                'username' => $username,
+                'email' => $email,
+                'email_consent' => $email_consent
+            ];
+            sendWelcomeEmail($conn, $welcome_user);
 
             // ── Plan ke saath redirect ──
             $redirect = !empty($selected_plan)
@@ -92,7 +104,7 @@ $plan_emoji  = ['basic' => '🎟️', 'starter' => '⭐', 'pro' => '🏆'];
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Register — Bitchat</title>
+<title>Register — Bitchatbot</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -117,7 +129,7 @@ label { display:block; font-size:12.5px; font-weight:600; color:#9CA3AF; margin-
             <svg width="24" height="24" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
         </div>
         <h1 style="font-size:24px;font-weight:800;color:white;margin-bottom:5px;">Create your account</h1>
-        <p style="font-size:13.5px;color:#6B7280;">Join Bitchat and deploy your AI chatbot</p>
+        <p style="font-size:13.5px;color:#6B7280;">Join Bitchatbot and deploy your AI chatbot</p>
     </div>
 
     <!-- ── Selected Plan Badge (agar plan select hua hai) ── -->
@@ -176,6 +188,19 @@ label { display:block; font-size:12.5px; font-weight:600; color:#9CA3AF; margin-
                     </button>
                 </div>
             </div>
+
+            <!-- Email Consent - INSIDE FORM -->
+            <div style="padding:14px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.15);border-radius:10px;">
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:0;">
+                    <input type="checkbox" name="email_consent" value="1" required style="margin-top:2px;width:16px;height:16px;cursor:pointer;">
+                    <span style="font-size:12.5px;color:#9CA3AF;line-height:1.5;">
+                        I agree to receive email notifications including <strong style="color:#D1D5DB;">plan expiry alerts</strong>, 
+                        <strong style="color:#D1D5DB;">renewal reminders</strong>, and important account updates. 
+                        <a href="privacy.php" target="_blank" style="color:#818cf8;text-decoration:underline;">Privacy Policy</a>
+                    </span>
+                </label>
+            </div>
+
             <button type="submit" class="btn" style="margin-top:4px;">
                 Create Account <?php echo !empty($selected_plan) ? '& Go to '.$plan_labels[$selected_plan] : ''; ?> →
             </button>
