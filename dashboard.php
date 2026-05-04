@@ -1,4 +1,4 @@
-  <?php
+<?php
   require_once 'config/main_config.php';
 
   if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in'])) {
@@ -29,20 +29,12 @@
       $expiry = new DateTime($plan_expiry_date);
       $today = new DateTime();
       $today->setTime(0, 0, 0);
-      
-      if ($expiry < $today) {
-          $plan_expired = true;
-          $days_left = 0;
-      } else {
-          $diff = $today->diff($expiry);
-          $days_left = $diff->days;
-      }
+      if ($expiry < $today) { $plan_expired = true; $days_left = 0; }
+      else { $diff = $today->diff($expiry); $days_left = $diff->days; }
   }
 
-  // If plan expired, restrict access - redirect to renew page
   if ($plan_expired && $_SESSION['role'] !== 'admin') {
-      header('Location: select_plan.php?renew=1');
-      exit();
+      header('Location: select_plan.php?renew=1'); exit();
   }
 
   if ($_SESSION['status'] === 'pending') {
@@ -91,6 +83,8 @@
       $sites_stmt2->bind_param("i", $_SESSION['user_id']); $sites_stmt2->execute();
       $user_sites = $sites_stmt2->get_result()->fetch_all(MYSQLI_ASSOC); $sites_stmt2->close();
   }
+
+  $has_any_site = !empty($user_sites);
 
   // ── Active site from URL param or first ──
   $active_site_id = $_GET['site'] ?? ($user_sites[0]['site_id'] ?? '');
@@ -187,8 +181,27 @@
       }
   }
 
+  // Per-site settings: load chatbot_settings for every site
+  $all_site_settings = [];
+  if (!empty($user_sites)) {
+      $placeholders = implode(',', array_fill(0, count($user_sites), '?'));
+      $site_ids_arr = array_column($user_sites, 'site_id');
+      $types = str_repeat('s', count($site_ids_arr));
+      $ss_stmt = $conn->prepare("SELECT site_id, chatbot_name, primary_color, greeting_msg FROM chatbot_settings WHERE user_id = ? AND site_id IN ($placeholders)");
+      if ($ss_stmt) {
+          $params = array_merge([$user_id], $site_ids_arr);
+          $types_full = 'i' . $types;
+          $ss_stmt->bind_param($types_full, ...$params);
+          $ss_stmt->execute();
+          $ss_result = $ss_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+          foreach ($ss_result as $sr) $all_site_settings[$sr['site_id']] = $sr;
+          $ss_stmt->close();
+      }
+  }
+
   $plan_cfg = [
       'basic'   => ['color'=>'#94A3B8','bg'=>'rgba(148,163,184,0.08)','border'=>'rgba(148,163,184,0.15)','label'=>'Basic'],
+      'free'    => ['color'=>'#94A3B8','bg'=>'rgba(148,163,184,0.08)','border'=>'rgba(148,163,184,0.15)','label'=>'Free'],
       'starter' => ['color'=>'#818CF8','bg'=>'rgba(129,140,248,0.08)','border'=>'rgba(129,140,248,0.15)','label'=>'Starter'],
       'pro'     => ['color'=>'#38BDF8','bg'=>'rgba(56,189,248,0.08)','border'=>'rgba(56,189,248,0.15)','label'=>'Pro'],
   ];
@@ -241,6 +254,7 @@
   .nav-item:hover { background: var(--surface2); color: var(--text); }
   .nav-item.active { background: var(--accent-glow); color: #A5B4FC; border: 1px solid var(--accent-border); }
   .nav-item.active svg { opacity: 1; }
+  .nav-item.disabled-nav { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
   .nav-badge { margin-left: auto; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px; background: rgba(99,102,241,0.15); color: #818CF8; font-family: 'DM Mono', monospace; }
   .nav-dot { margin-left: auto; width: 5px; height: 5px; border-radius: 50%; background: var(--amber); }
   .nav-lock { margin-left: auto; font-size: 9.5px; font-weight: 600; padding: 2px 6px; border-radius: 6px; background: rgba(251,191,36,0.08); color: var(--amber); border: 1px solid rgba(251,191,36,0.15); }
@@ -316,6 +330,19 @@
   .info-label { color: var(--text-muted); font-weight: 500; }
   .info-val { color: var(--text); font-weight: 500; }
 
+  /* ── SITE SETTINGS ACCORDION ── */
+  .site-settings-block { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 14px; }
+  .site-settings-header { padding: 16px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.15s; }
+  .site-settings-header:hover { background: rgba(255,255,255,0.02); }
+  .site-settings-body { padding: 20px; border-top: 1px solid var(--border); display: none; }
+  .site-settings-body.open { display: block; }
+  .site-settings-header .chevron { margin-left: auto; transition: transform 0.2s; color: var(--text-dim); }
+  .site-settings-header.expanded .chevron { transform: rotate(180deg); }
+
+  /* ── NO SITE EMPTY STATE ── */
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 420px; text-align: center; }
+  .empty-state-icon { width: 72px; height: 72px; border-radius: 20px; background: var(--accent-glow); border: 1px solid var(--accent-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+
   /* ── MODAL ── */
   .modal-bg { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 24px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
   .modal-bg.open { opacity: 1; pointer-events: all; }
@@ -368,6 +395,13 @@
         <span class="sites-header-count"><?php echo count($user_sites); ?> / <?php echo $max_sites; ?></span>
       </div>
 
+      <?php if(empty($user_sites)): ?>
+      <div style="background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">
+        <p style="font-size:11.5px;color:var(--amber);font-weight:600;margin-bottom:3px;">No site added yet</p>
+        <p style="font-size:11px;color:rgba(251,191,36,0.7);">Add your first site to get started.</p>
+      </div>
+      <?php endif; ?>
+
       <?php foreach($user_sites as $i => $s): ?>
       <a href="?site=<?php echo urlencode($s['site_id']); ?>" class="site-tab <?php echo $s['site_id']===$active_site_id?'active':''; ?>">
         <span class="site-dot" style="background:<?php echo $s['has_data']?'var(--green)':'var(--amber)'; ?>;<?php echo $s['has_data']?'box-shadow:0 0 5px var(--green)':''; ?>;"></span>
@@ -395,10 +429,11 @@
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
       Overview
     </button>
-    <button onclick="showSection('upload')" id="nav-upload" class="nav-item">
+    <button onclick="<?php echo $has_any_site ? "showSection('upload')" : "openAddSiteModal()"; ?>" id="nav-upload" class="nav-item<?php echo !$has_any_site?' disabled-nav':''; ?>" <?php echo !$has_any_site?'title="Add a site first to upload data"':''; ?>>
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
       Upload Data
-      <?php if(!$has_data): ?><span class="nav-dot"></span><?php endif; ?>
+      <?php if(!$has_data && $has_any_site): ?><span class="nav-dot"></span><?php endif; ?>
+      <?php if(!$has_any_site): ?><span class="nav-lock">No Site</span><?php endif; ?>
     </button>
     <button onclick="showSection('conversations')" id="nav-conversations" class="nav-item">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -449,31 +484,21 @@
   <!-- ── MAIN ── -->
   <main class="main">
 
-  <!-- ── Active site banner ── -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:10px;">
+  <!-- ── Active site banner (NO edit button here) ── -->
+  <?php if($has_any_site): ?>
+  <div style="display:flex;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:10px;">
     <div style="display:flex;align-items:center;gap:10px;">
       <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $has_data?'var(--green)':'var(--amber)';?>;box-shadow:0 0 6px <?php echo $has_data?'var(--green)':'var(--amber)';?>;"></div>
       <span style="font-size:14px;font-weight:700;color:white;"><?php echo htmlspecialchars($active_site['site_name'] ?? 'My Site'); ?></span>
       <code style="font-size:11px;color:var(--text-muted);background:var(--surface2);padding:2px 8px;border-radius:6px;font-family:'DM Mono',monospace;"><?php echo htmlspecialchars($site_id); ?></code>
     </div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="openEditSiteModal('<?php echo htmlspecialchars(addslashes($site_id)); ?>','<?php echo htmlspecialchars(addslashes($active_site['site_name']??'')); ?>','<?php echo htmlspecialchars(addslashes($active_site['website_url']??'')); ?>')" class="btn btn-secondary" style="font-size:12px;padding:6px 12px;">
-        ✏️ Edit Site
-      </button>
-      <?php if(count($user_sites) > 1): ?>
-      <button onclick="deleteSite('<?php echo htmlspecialchars(addslashes($site_id)); ?>')" class="btn btn-danger" style="font-size:12px;padding:6px 12px;">
-        🗑️ Delete
-      </button>
-      <?php endif; ?>
-    </div>
   </div>
+  <?php endif; ?>
 
   <!-- ── Plan Expiry Banner ── -->
   <?php if($plan_expired): ?>
   <div class="alert-banner" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);margin-bottom:20px;">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;color:var(--red);">
-      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-    </svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;color:var(--red);"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
     <div style="flex:1;">
       <p style="font-size:13.5px;font-weight:700;color:var(--red);">Your plan has expired</p>
       <p style="font-size:12px;color:rgba(248,113,113,0.8);margin-top:2px;">Your chatbot is no longer active. Renew your plan to restore service.</p>
@@ -482,9 +507,7 @@
   </div>
   <?php elseif($days_left <= 5 && $days_left > 0): ?>
   <div class="alert-banner" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);margin-bottom:20px;">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;color:var(--amber);">
-      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-    </svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;color:var(--amber);"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     <div style="flex:1;">
       <p style="font-size:13.5px;font-weight:700;color:var(--amber);">Plan expires in <?php echo $days_left; ?> <?php echo $days_left==1?'day':'days'; ?></p>
       <p style="font-size:12px;color:rgba(251,191,36,0.8);margin-top:2px;">Renew now to avoid interruption.</p>
@@ -497,17 +520,45 @@
   <section id="overview-section">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
       <div class="section-header" style="margin-bottom:0;">
-        <h1 class="section-title">Welcome back, <?php echo htmlspecialchars($username); ?></h1>
+        <h1 class="section-title">Welcome back, <?php echo htmlspecialchars($username); ?> 👋</h1>
+        <?php if($has_any_site): ?>
         <p class="section-sub">Viewing: <strong style="color:#A5B4FC;"><?php echo htmlspecialchars($active_site['site_name']??$site_id); ?></strong></p>
+        <?php else: ?>
+        <p class="section-sub">Get started by adding your first site below.</p>
+        <?php endif; ?>
       </div>
     </div>
+
+    <?php if(!$has_any_site): ?>
+    <!-- ── No site onboarding ── -->
+    <div style="background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(56,189,248,0.04));border:1px solid var(--accent-border);border-radius:20px;padding:48px 32px;text-align:center;margin-bottom:24px;">
+      <div style="width:64px;height:64px;border-radius:18px;background:var(--accent-glow);border:1px solid var(--accent-border);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path stroke="#818CF8" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+      </div>
+      <h2 style="font-size:18px;font-weight:700;color:white;margin-bottom:8px;">Add your first site to get started</h2>
+      <p style="font-size:13.5px;color:var(--text-muted);max-width:400px;margin:0 auto 24px;line-height:1.6;">Each site gets its own chatbot, knowledge base, and embed code. Add a site, upload your data, and go live in minutes.</p>
+      <button onclick="openAddSiteModal()" class="btn btn-primary" style="padding:11px 28px;font-size:14px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+        Add Your First Site
+      </button>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:32px;max-width:500px;margin-left:auto;margin-right:auto;">
+        <?php foreach([['1','Add a Site','Name it and set a domain'],['2','Upload Data','Train your chatbot'],['3','Embed & Go Live','Paste one line of code']] as $step): ?>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center;">
+          <div style="width:28px;height:28px;border-radius:8px;background:var(--accent-glow);border:1px solid var(--accent-border);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:12px;font-weight:700;color:#A5B4FC;"><?php echo $step[0]; ?></div>
+          <p style="font-size:12px;font-weight:700;color:white;margin-bottom:3px;"><?php echo $step[1]; ?></p>
+          <p style="font-size:11px;color:var(--text-muted);"><?php echo $step[2]; ?></p>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php else: ?>
 
     <?php if(!$has_data): ?>
     <div class="alert-banner alert-amber" style="margin-bottom:20px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;color:var(--amber);"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
       <div style="flex:1;">
         <p style="font-size:13px;font-weight:600;color:var(--amber);">This site has no data yet</p>
-        <p style="font-size:12px;color:rgba(251,191,36,0.7);margin-top:2px;">Upload knowledge base for <strong><?php echo htmlspecialchars($active_site['site_name']??$site_id); ?></strong></p>
+        <p style="font-size:12px;color:rgba(251,191,36,0.7);margin-top:2px;">Upload your knowledge base so your chatbot can start answering questions.</p>
       </div>
       <button onclick="showSection('upload')" class="btn btn-secondary" style="font-size:12px;padding:7px 14px;flex-shrink:0;">Upload Data →</button>
     </div>
@@ -551,13 +602,27 @@
       <?php endforeach; ?>
       <?php endif; ?>
     </div>
+    <?php endif; ?>
   </section>
 
   <!-- ════════════════ UPLOAD ════════════════ -->
   <section id="upload-section" style="display:none;">
+    <?php if(!$has_any_site): ?>
+    <div class="empty-state">
+      <div class="empty-state-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path stroke="#818CF8" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+      </div>
+      <h2 style="font-size:17px;font-weight:700;color:white;margin-bottom:8px;">No site added yet</h2>
+      <p style="font-size:13px;color:var(--text-muted);max-width:340px;margin:0 auto 20px;line-height:1.6;">You need to add a site before you can upload data. Each site has its own separate knowledge base.</p>
+      <button onclick="openAddSiteModal()" class="btn btn-primary" style="padding:10px 24px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+        Add Your First Site
+      </button>
+    </div>
+    <?php else: ?>
     <div class="section-header">
       <h1 class="section-title">Upload Knowledge Base</h1>
-      <p class="section-sub">Training <strong style="color:#A5B4FC;"><?php echo htmlspecialchars($active_site['site_name']??$site_id); ?></strong> · Limit: <strong style="color:#A5B4FC;"><?php echo $upload_limit; ?> MB</strong></p>
+      <p class="section-sub">Training <strong style="color:#A5B4FC;"><?php echo htmlspecialchars($active_site['site_name']??$site_id); ?></strong> · Limit: <strong style="color:#A5B4FC;"><?php echo $upload_limit; ?> MB</strong> · Data is separate per site</p>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:flex-start;">
       <div>
@@ -600,6 +665,7 @@
         <?php endif; ?>
       </div>
     </div>
+    <?php endif; ?>
   </section>
 
   <!-- ════════════════ CONVERSATIONS ════════════════ -->
@@ -653,18 +719,6 @@
       <p class="section-sub">For <strong style="color:#A5B4FC;"><?php echo htmlspecialchars($active_site['site_name']??$site_id); ?></strong> — paste before <code style="color:#A5B4FC;">&lt;/body&gt;</code></p>
     </div>
     <div style="max-width:680px;">
-      <?php if(!empty($active_site['website_url'])): ?>
-      <div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <p style="font-size:12.5px;color:var(--green);">🔒 Domain locked to: <strong><?php echo htmlspecialchars($active_site['website_url']); ?></strong></p>
-      </div>
-      <?php else: ?>
-      <div style="background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <p style="font-size:12.5px;color:var(--amber);flex:1;">⚠️ No domain restriction set. Widget will work on any website.</p>
-        <button onclick="openEditSiteModal('<?php echo htmlspecialchars(addslashes($site_id)); ?>','<?php echo htmlspecialchars(addslashes($active_site['site_name']??'')); ?>','<?php echo htmlspecialchars(addslashes($active_site['website_url']??'')); ?>')" class="btn btn-secondary" style="font-size:12px;padding:6px 12px;">Set Domain →</button>
-      </div>
-      <?php endif; ?>
-
       <div class="code-block" id="embedCode" style="padding-right:90px;">&lt;script src="https://bitchatbot.io/widget.js" data-site-id="<?php echo htmlspecialchars($site_id); ?>"&gt;&lt;/script&gt;</div>
       <button onclick="copyEmbed()" id="copyBtn" style="position:relative;margin-top:-44px;float:right;margin-right:18px;background:var(--surface3);border:1px solid var(--border);color:var(--text-muted);padding:6px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;z-index:1;">Copy</button>
       <div style="clear:both;"></div>
@@ -702,40 +756,27 @@
 
   <!-- ════════════════ SETTINGS ════════════════ -->
   <section id="settings-section" style="display:none;">
-    <div class="section-header"><h1 class="section-title">Settings</h1><p class="section-sub">Account and plan management</p></div>
-    <div style="max-width:580px;display:flex;flex-direction:column;gap:16px;">
+    <div class="section-header">
+      <h1 class="section-title">Settings</h1>
+      <p class="section-sub">Account, plan and per-site management</p>
+    </div>
+    <div style="max-width:620px;display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Account Info -->
       <div class="settings-card">
         <div class="settings-card-header"><p style="font-size:13.5px;font-weight:700;color:white;">Account Information</p></div>
         <div class="settings-card-body">
           <div class="info-row"><span class="info-label">Username</span><span class="info-val"><?php echo htmlspecialchars($username); ?></span></div>
           <div class="info-row"><span class="info-label">Email</span><span class="info-val"><?php echo htmlspecialchars($email); ?></span></div>
           <div class="info-row"><span class="info-label">Plan</span><span class="plan-chip" style="background:<?php echo $pc['bg'];?>;color:<?php echo $pc['color'];?>;border:1px solid <?php echo $pc['border'];?>;"><?php echo strtoupper($plan); ?></span></div>
-          <div class="info-row"><span class="info-label">Sites</span><span class="info-val"><?php echo count($user_sites); ?> / <?php echo $max_sites; ?></span></div>
+          <div class="info-row"><span class="info-label">Sites Used</span><span class="info-val"><?php echo count($user_sites); ?> / <?php echo $max_sites; ?></span></div>
         </div>
       </div>
 
+      <!-- Plan Info -->
       <div class="settings-card">
         <div class="settings-card-header">
-          <p style="font-size:13.5px;font-weight:700;color:white;">My Sites</p>
-          <?php if(count($user_sites) < $max_sites): ?><button onclick="openAddSiteModal()" class="btn btn-secondary" style="font-size:12px;padding:6px 14px;">+ Add Site</button><?php endif; ?>
-        </div>
-        <div class="settings-card-body" style="padding:0;">
-          <?php foreach($user_sites as $s): ?>
-          <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border-soft);">
-            <div style="width:8px;height:8px;border-radius:50%;background:<?php echo $s['has_data']?'var(--green)':'var(--amber)';?>;flex-shrink:0;"></div>
-            <div style="flex:1;min-width:0;">
-              <p style="font-size:13px;font-weight:600;color:white;"><?php echo htmlspecialchars($s['site_name']); ?></p>
-              <p style="font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;"><?php echo htmlspecialchars($s['site_id']); ?></p>
-            </div>
-            <button onclick="openEditSiteModal('<?php echo htmlspecialchars(addslashes($s['site_id'])); ?>','<?php echo htmlspecialchars(addslashes($s['site_name'])); ?>','<?php echo htmlspecialchars(addslashes($s['website_url']??'')); ?>')" class="btn btn-secondary" style="font-size:11px;padding:5px 10px;">Edit</button>
-          </div>
-          <?php endforeach; ?>
-        </div>
-      </div>
-
-      <div class="settings-card">
-        <div class="settings-card-header">
-          <p style="font-size:13.5px;font-weight:700;color:white;">Plan</p>
+          <p style="font-size:13.5px;font-weight:700;color:white;">Plan Details</p>
           <a href="select_plan.php?upgrade=1" class="btn btn-secondary" style="font-size:12px;padding:6px 14px;">Manage Plan</a>
         </div>
         <div class="settings-card-body">
@@ -748,6 +789,89 @@
           <div class="info-row"><span class="info-label">Upload Limit</span><span class="info-val"><?php echo $upload_limit; ?> MB per site</span></div>
         </div>
       </div>
+
+      <!-- Per-Site Settings -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div>
+            <p style="font-size:15px;font-weight:700;color:white;">Site Settings</p>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:3px;">Each site has independent configuration</p>
+          </div>
+          <?php if(count($user_sites) < $max_sites): ?>
+          <button onclick="openAddSiteModal()" class="btn btn-secondary" style="font-size:12px;padding:6px 14px;">+ Add Site</button>
+          <?php endif; ?>
+        </div>
+
+        <?php if(empty($user_sites)): ?>
+        <div class="settings-card" style="padding:32px;text-align:center;">
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">No sites yet. Add your first site to get started.</p>
+          <button onclick="openAddSiteModal()" class="btn btn-primary" style="font-size:13px;">Add Your First Site</button>
+        </div>
+        <?php else: ?>
+        <?php foreach($user_sites as $i => $s):
+          $s_settings = $all_site_settings[$s['site_id']] ?? [];
+          $s_chatbot_name = $s_settings['chatbot_name'] ?? 'Bitchat Assistant';
+          $s_color = $s_settings['primary_color'] ?? '#6C3CE1';
+        ?>
+        <div class="site-settings-block">
+          <div class="site-settings-header" onclick="toggleSiteSettings('site-body-<?php echo $i; ?>', this)">
+            <div style="width:10px;height:10px;border-radius:50%;background:<?php echo $s['has_data']?'var(--green)':'var(--amber)';?>;flex-shrink:0;<?php echo $s['has_data']?'box-shadow:0 0 5px var(--green)':''; ?>"></div>
+            <div style="flex:1;min-width:0;">
+              <p style="font-size:14px;font-weight:700;color:white;"><?php echo htmlspecialchars($s['site_name']); ?></p>
+              <p style="font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;margin-top:2px;"><?php echo htmlspecialchars($s['site_id']); ?></p>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <span class="tag <?php echo $s['has_data']?'tag-success':'tag-warn'; ?>"><?php echo $s['has_data']?'Active':'No Data'; ?></span>
+              <span class="tag" style="background:var(--surface3);color:var(--text-muted);border:1px solid var(--border);">#<?php echo $i+1; ?></span>
+            </div>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+          <div class="site-settings-body" id="site-body-<?php echo $i; ?>">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+              <div class="info-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:0;">
+                <span class="info-label" style="margin-bottom:0;">Site Name</span>
+                <span class="info-val"><?php echo htmlspecialchars($s['site_name']); ?></span>
+              </div>
+              <div class="info-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:0;">
+                <span class="info-label" style="margin-bottom:0;">Domain Restriction</span>
+                <span class="info-val" style="font-size:12px;"><?php echo $s['website_url']?'🔒 '.htmlspecialchars($s['website_url']):'<span style="color:var(--text-muted);">None (works anywhere)</span>'; ?></span>
+              </div>
+              <div class="info-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:0;">
+                <span class="info-label" style="margin-bottom:0;">Data Status</span>
+                <span class="info-val" style="color:<?php echo $s['has_data']?'var(--green)':'var(--amber)'; ?>;"><?php echo $s['has_data']?'✅ Knowledge base loaded':'⏳ No data uploaded'; ?></span>
+              </div>
+              <?php if($plan_has_cust): ?>
+              <div class="info-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:0;">
+                <span class="info-label" style="margin-bottom:0;">Chatbot Name</span>
+                <span class="info-val"><?php echo htmlspecialchars($s_chatbot_name); ?></span>
+              </div>
+              <?php endif; ?>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border-soft);">
+              <button onclick="openEditSiteModal('<?php echo htmlspecialchars(addslashes($s['site_id'])); ?>','<?php echo htmlspecialchars(addslashes($s['site_name'])); ?>','<?php echo htmlspecialchars(addslashes($s['website_url']??'')); ?>')" class="btn btn-secondary" style="font-size:12px;padding:7px 14px;">
+                ✏️ Edit Site
+              </button>
+              <a href="?site=<?php echo urlencode($s['site_id']); ?>&section=upload" onclick="event.preventDefault();window.location.href='?site=<?php echo urlencode($s['site_id']); ?>';setTimeout(()=>showSection('upload'),400);" class="btn btn-secondary" style="font-size:12px;padding:7px 14px;text-decoration:none;">
+                📤 Upload Data
+              </a>
+              <?php if($plan_has_cust): ?>
+              <a href="chatbot_customize.php?site=<?php echo urlencode($s['site_id']); ?>" class="btn btn-secondary" style="font-size:12px;padding:7px 14px;text-decoration:none;">🎨 Customize</a>
+              <?php endif; ?>
+              <a href="?site=<?php echo urlencode($s['site_id']); ?>&section=embed" onclick="event.preventDefault();window.location.href='?site=<?php echo urlencode($s['site_id']); ?>';setTimeout(()=>showSection('embed'),400);" class="btn btn-secondary" style="font-size:12px;padding:7px 14px;text-decoration:none;">
+                &lt;/&gt; Embed Code
+              </a>
+              <?php if(count($user_sites) > 1): ?>
+              <button onclick="deleteSite('<?php echo htmlspecialchars(addslashes($s['site_id'])); ?>')" class="btn btn-danger" style="font-size:12px;padding:7px 14px;margin-left:auto;">
+                🗑️ Delete Site
+              </button>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+        <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+
     </div>
   </section>
 
@@ -758,7 +882,7 @@
     <div class="modal-box">
       <button class="modal-close" onclick="closeModal('addSiteModal')">✕</button>
       <p class="modal-title">➕ Add New Site</p>
-      <p class="modal-sub">Each site gets its own chatbot, data, and embed code.</p>
+      <p class="modal-sub">Each site gets its own chatbot, knowledge base, and embed code.</p>
       <div id="addSiteMsg"></div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div>
@@ -766,9 +890,9 @@
           <input type="text" id="newSiteName" class="inp" placeholder="e.g. My Shop, Support Bot, Client XYZ" maxlength="100">
         </div>
         <div>
-          <label class="field-label">Website URL (for domain lock)</label>
-          <input type="text" id="newSiteUrl" class="inp" placeholder="https://mywebsite.com (optional)">
-          <p style="font-size:11.5px;color:var(--text-muted);margin-top:5px;">Widget will only work on this domain if set.</p>
+          <label class="field-label">Website URL (optional — for domain lock)</label>
+          <input type="text" id="newSiteUrl" class="inp" placeholder="https://mywebsite.com">
+          <p style="font-size:11.5px;color:var(--text-muted);margin-top:5px;">Widget will only work on this domain if set. You can add or change this later in Settings.</p>
         </div>
         <button onclick="createSite()" class="btn btn-primary btn-full" id="createSiteBtn">Create Site</button>
       </div>
@@ -780,7 +904,7 @@
     <div class="modal-box">
       <button class="modal-close" onclick="closeModal('editSiteModal')">✕</button>
       <p class="modal-title">✏️ Edit Site</p>
-      <p class="modal-sub">Update name and domain restriction.</p>
+      <p class="modal-sub">Update name and domain restriction for this site.</p>
       <input type="hidden" id="editSiteId">
       <div id="editSiteMsg"></div>
       <div style="display:flex;flex-direction:column;gap:12px;">
@@ -803,6 +927,7 @@
   <script>
   const sessionsData   = <?php echo json_encode($sessions, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
   const ACTIVE_SITE_ID = <?php echo json_encode($active_site_id); ?>;
+  const HAS_ANY_SITE   = <?php echo json_encode($has_any_site); ?>;
   let selectedFile     = null;
 
   // ── Sidebar toggle ──
@@ -816,6 +941,11 @@
 
   // ── Section nav ──
   function showSection(name) {
+      // Guard upload if no site
+      if (name === 'upload' && !HAS_ANY_SITE) {
+          openAddSiteModal();
+          return;
+      }
       ['overview','upload','conversations','test','embed','settings'].forEach(s => {
           const sec = document.getElementById(s + '-section');
           const btn = document.getElementById('nav-' + s);
@@ -830,6 +960,14 @@
           document.getElementById('sidebar').style.transform = 'translateX(-100%)';
           document.getElementById('overlay').style.display = 'none';
       }
+  }
+
+  // ── Site settings accordion ──
+  function toggleSiteSettings(bodyId, header) {
+      const body = document.getElementById(bodyId);
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open', !isOpen);
+      header.classList.toggle('expanded', !isOpen);
   }
 
   // ── Sessions ──
@@ -896,7 +1034,7 @@
       }, 1000);
       const fd = new FormData();
       fd.append('qa_file', selectedFile);
-      fd.append('site_ref', ACTIVE_SITE_ID);  // Pass active site to upload.php
+      fd.append('site_ref', ACTIVE_SITE_ID);
       try {
           const res  = await fetch('upload.php', { method: 'POST', body: fd });
           const data = await res.json();
