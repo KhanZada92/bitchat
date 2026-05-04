@@ -737,38 +737,6 @@ body::before {
     </div>
   </div>
 </section>
-
-<!-- ══ FAQ ══ -->
-<section id="faq" class="faq-section">
-  <div class="section-center">
-    <span class="section-eyebrow">FAQ</span>
-    <h2 class="section-h2" style="margin:8px auto 0;max-width:460px;">Common questions answered</h2>
-  </div>
-  <div class="faq-list">
-    <?php
-    $faqs = [
-      ['What is Bitchatbot and how does it work?', 'Bitchatbot is an AI chatbot platform where you upload your own data — FAQs, PDF documents, or DOCX files — and it creates a chatbot trained specifically on that content. The chatbot is embedded on your website via a small script tag and answers your visitors\' questions automatically, based only on the information you\'ve provided.'],
-      ['What file types can I upload to train the chatbot?', 'You can upload PDF files, DOCX (Word) documents, and plain-text FAQ files. The system parses the content, extracts question-answer pairs where possible, and stores it for the chatbot to reference when answering visitor questions.'],
-      ['Will the chatbot answer questions outside my uploaded data?', 'No. The chatbot only draws from the content you\'ve uploaded. If a visitor asks something not covered in your data, the bot will acknowledge it can\'t help with that topic and suggest the visitor contact you directly.'],
-      ['How do I add the chatbot to my website?', 'After registering and setting up your chatbot, you\'ll find a unique embed code in your dashboard. Copy and paste this single script tag into your website\'s HTML — before the closing &lt;/body&gt; tag — and the chatbot widget will appear immediately.'],
-      ['Can I update my chatbot\'s data after going live?', 'Yes. You can upload new files anytime from your dashboard. When you upload, the system refreshes your chatbot\'s knowledge base with the latest content. Your existing embed code stays the same.'],
-      ['Can I use a coupon to get the Basic plan free?', 'Yes. If you have a valid coupon code, you can apply it during registration or from your dashboard to activate the Basic plan at no cost for the coupon\'s validity period.'],
-      ['Where is my conversation history stored and can I access it?', 'All conversations are stored securely and accessible from the "Conversations" section of your dashboard. You can browse chat sessions, see which questions are most common, and improve your data accordingly.'],
-      ['Can I cancel my subscription anytime?', 'Yes. All paid plans are billed monthly and can be cancelled at any time from your dashboard. No long-term contracts or cancellation fees. Your chatbot remains active until the end of your current billing period.'],
-    ];
-    foreach ($faqs as $faq):
-    ?>
-    <div class="faq-item">
-      <button class="faq-q" onclick="toggleFaq(this)">
-        <span class="faq-q-text"><?= $faq[0] ?></span>
-        <span class="faq-icon">+</span>
-      </button>
-      <div class="faq-a"><?= $faq[1] ?></div>
-    </div>
-    <?php endforeach; ?>
-  </div>
-</section>
-
 <!-- ══ FOOTER ══ -->
 <footer class="site-footer">
   <div class="footer-inner">
