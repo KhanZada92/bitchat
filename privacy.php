@@ -417,7 +417,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
         <div class="ps-contact-row">
           <div class="ps-contact-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke="#818CF8" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="#818CF8" stroke-width="1.8" stroke-linecap="round"/></svg></div>
           <span class="ps-contact-label">Response</span>
-          <span class="ps-contact-val" style="color:var(--text-muted);">Within 14 business days</span>
+          <span class="ps-contact-val" style="color:var(--text-muted);">Within 24 hours</span>
         </div>
       </div>
     </div>

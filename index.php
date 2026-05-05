@@ -404,18 +404,6 @@ body::before {
 .btn-cta-sec { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14.5px; font-weight: 600; color: var(--text-dim); background: rgba(255,255,255,0.04); border: 1px solid var(--border); text-decoration: none; padding: 13px 28px; border-radius: 11px; transition: all 0.22s; }
 .btn-cta-sec:hover { color: white; background: rgba(255,255,255,0.07); }
 
-/* ── FAQ ── */
-.faq-section { padding: 100px 32px; background: rgba(6,8,18,0.8); border-top: 1px solid var(--border); }
-.faq-list { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-.faq-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: border-color 0.2s; }
-.faq-item:hover { border-color: rgba(91,94,244,0.2); }
-.faq-q { width: 100%; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: none; border: none; cursor: pointer; text-align: left; }
-.faq-q-text { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px; font-weight: 700; color: white; letter-spacing: -0.01em; }
-.faq-icon { width: 24px; height: 24px; flex-shrink: 0; border-radius: 6px; background: rgba(91,94,244,0.08); border: 1px solid rgba(91,94,244,0.15); display: flex; align-items: center; justify-content: center; transition: all 0.2s; color: #818CF8; font-size: 16px; font-weight: 300; }
-.faq-a { padding: 0 24px; max-height: 0; overflow: hidden; transition: max-height 0.35s ease, padding 0.25s; font-size: 14px; color: var(--text-muted); line-height: 1.78; }
-.faq-a.open { max-height: 220px; padding: 0 24px 20px; }
-.faq-icon.open { background: rgba(91,94,244,0.14); transform: rotate(45deg); }
-
 /* ── FOOTER ── */
 .site-footer { padding: 60px 32px 32px; background: var(--bg-deep); border-top: 1px solid var(--border); }
 .footer-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 48px; margin-bottom: 48px; }
@@ -485,8 +473,8 @@ body::before {
       <a href="#how-it-works">How It Works</a>
       <a href="#pricing">Pricing</a>
       <a href="about.php">About</a>
-      <a href="#faq">FAQ</a>
       <a href="privacy.php">Privacy</a>
+      <a href="terms.php">Terms</a>
     </div>
 
     <!-- Right: Auth buttons -->
@@ -510,8 +498,8 @@ body::before {
     <a href="#how-it-works" onclick="closeMNav()">How It Works</a>
     <a href="#pricing" onclick="closeMNav()">Pricing</a>
     <a href="about.php" onclick="closeMNav()">About</a>
-    <a href="#faq" onclick="closeMNav()">FAQ</a>
     <a href="privacy.php" onclick="closeMNav()">Privacy</a>
+    <a href="terms.php" onclick="closeMNav()">Terms</a> 
   </div>
 </div>
 
@@ -766,7 +754,6 @@ body::before {
         <li><a href="#features">Features</a></li>
         <li><a href="#how-it-works">How It Works</a></li>
         <li><a href="#pricing">Pricing</a></li>
-        <li><a href="#faq">FAQ</a></li>
       </ul>
     </div>
     <div>
@@ -774,6 +761,7 @@ body::before {
       <ul class="footer-links">
         <li><a href="about.php">About Us</a></li>
         <li><a href="privacy.php">Privacy Policy</a></li>
+        <li><a href="terms.php">Terms &amp; Conditions</a></li>
         <li><a href="login.php">Login</a></li>
         <li><a href="register.php">Register</a></li>
       </ul>
