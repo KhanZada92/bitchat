@@ -441,6 +441,10 @@ body::before {
 @media(max-width:600px){
   .nav-links{display:none}
   .nav-menu-btn{display:flex}
+  .nav-inner{padding:0 16px}
+  .nav-actions{gap:8px;margin-left:auto}
+  .btn-primary{padding:8px 13px;font-size:12.5px;line-height:1.2;height:36px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px}
+  .btn-ghost{padding:8px 10px;font-size:12.5px;height:36px;display:inline-flex;align-items:center}
   .hero-h1{font-size:42px}
   .stats-bar{flex-direction:column}
   .stat-item{border-right:none;border-bottom:1px solid var(--border)}
@@ -459,12 +463,23 @@ body::before {
 <!-- ══ NAVIGATION ══ -->
 <nav class="nav-bar">
   <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <div class="nav-logo-mark">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21 15C21 15.53 20.79 16.04 20.41 16.41C20.04 16.79 19.53 17 19 17H7L3 21V5C3 4.47 3.21 3.96 3.59 3.59C3.96 3.21 4.47 3 5 3H19C19.53 3 20.04 3.21 20.41 3.59C20.79 3.96 21 4.47 21 5V15Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-      <span class="nav-logo-text">Bitchatbot</span>
-    </a>
+
+    <!-- Left: Hamburger (mobile) + Logo -->
+<div style="display:flex;align-items:center;gap:6px;">
+        <button class="nav-menu-btn" id="navMenuBtn" aria-label="Open menu" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-mark">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21 15C21 15.53 20.79 16.04 20.41 16.41C20.04 16.79 19.53 17 19 17H7L3 21V5C3 4.47 3.21 3.96 3.59 3.59C3.96 3.21 4.47 3 5 3H19C19.53 3 20.04 3.21 20.41 3.59C20.79 3.96 21 4.47 21 5V15Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="nav-logo-text">Bitchatbot</span>
+      </a>
+    </div>
+
+    <!-- Center: Desktop links -->
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-works">How It Works</a>
@@ -473,12 +488,9 @@ body::before {
       <a href="#faq">FAQ</a>
       <a href="privacy.php">Privacy</a>
     </div>
+
+    <!-- Right: Auth buttons -->
     <div class="nav-actions">
-      <button class="nav-menu-btn" id="navMenuBtn" aria-label="Open menu" type="button">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/>
-        </svg>
-      </button>
       <?php if (isset($_SESSION['user_id'])): ?>
         <a href="dashboard.php" class="btn-ghost">Dashboard</a>
         <a href="logout.php" class="btn-primary" style="background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.2);color:#F87171;">Logout</a>
@@ -487,6 +499,7 @@ body::before {
         <a href="register.php" class="btn-primary">Get Started</a>
       <?php endif; ?>
     </div>
+
   </div>
 </nav>
 
@@ -773,14 +786,44 @@ body::before {
 
 <!-- ══ WIDGET ══ -->
 <?php
-  $site_id = isset($_SESSION['site_id']) ? $_SESSION['site_id'] : '';
-  $site_id = preg_replace('/[^a-zA-Z0-9_]/', '', $site_id);
-  $chat_url = 'https://bitchatbot.io/chat' . ($site_id ? '?site=' . $site_id : '');
+$chat_url = 'https://bitchatbot.io/chat?site=bitchatbot_official';
 ?>
+
+<style>
+/* Mobile-only close button inside chat header area */
+@media (max-width: 480px) {
+  #bc-mob-close {
+    display: flex;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 9999;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0,0,0,0.25);
+    border: none;
+    border-radius: 20px;
+    padding: 5px 12px;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: 0.03em;
+  }
+}
+</style>
+
 <div id="bitchat-root" style="position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;align-items:flex-end;gap:12px;font-family:'Plus Jakarta Sans',sans-serif;">
-  <div id="bc-frame-wrap" style="width:330px;height:440px;border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(91,94,244,0.2),0 4px 16px rgba(0,0,0,0.08);border:1px solid rgba(91,94,244,0.2);display:none;transform-origin:bottom right;transform:scale(0.88) translateY(12px);opacity:0;transition:all 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+
+  <!-- Chat frame -->
+  <div id="bc-frame-wrap" style="position:relative;width:330px;height:440px;border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(91,94,244,0.2),0 4px 16px rgba(0,0,0,0.08);border:1px solid rgba(91,94,244,0.2);display:none;transform-origin:bottom right;transform:scale(0.88) translateY(12px);opacity:0;transition:all 0.32s cubic-bezier(0.34,1.56,0.64,1);">
+
+
     <iframe id="bc-iframe" src="<?= htmlspecialchars($chat_url) ?>" style="width:100%;height:440px;border:none;display:block;" frameborder="0" allow="microphone" title="Bitchat Assistant"></iframe>
   </div>
+
+  <!-- Toggle button (desktop: shows X when open / mobile: hidden when chat open) -->
   <button id="bc-toggle-btn" onclick="bcWidgetToggle()" style="display:flex;align-items:center;gap:9px;background:#5B5EF4;border:none;border-radius:50px;cursor:pointer;padding:0 18px 0 13px;height:50px;box-shadow:0 6px 24px rgba(91,94,244,0.35);transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);">
     <div style="width:26px;height:26px;background:rgba(255,255,255,0.18);border-radius:50%;display:flex;align-items:center;justify-content:center;">
       <svg id="bc-ico-chat" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 15C21 15.53 20.79 16.04 20.41 16.41C20.04 16.79 19.53 17 19 17H7L3 21V5C3 4.47 3.21 3.96 3.59 3.59C3.96 3.21 4.47 3 5 3H19C19.53 3 20.04 3.21 20.41 3.59C20.79 3.96 21 4.47 21 5V15Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -788,26 +831,87 @@ body::before {
     </div>
     <span id="bc-btn-label" style="font-size:13.5px;font-weight:700;color:white;letter-spacing:0.1px;white-space:nowrap;">Bitchat</span>
   </button>
+
 </div>
+
 <script>
-var bcOpen=false,BC_SITE_ID='<?= addslashes($site_id) ?>';
+var bcOpen = false, BC_SITE_ID = 'bitchatbot_official';
+// Mobile nav menu toggle
 (function(){
-  var btn=document.getElementById('navMenuBtn');
-  var m=document.getElementById('mnav');
-  if(!btn||!m) return;
-  function toggle(){ m.classList.toggle('open'); }
-  window.closeMNav=function(){ m.classList.remove('open'); };
-  btn.addEventListener('click', toggle);
-  document.addEventListener('keydown', function(e){ if(e.key==='Escape') window.closeMNav(); });
+  var btn = document.getElementById('navMenuBtn');
+  var m   = document.getElementById('mnav');
+  if (!btn || !m) return;
+  window.closeMNav = function(){ m.classList.remove('open'); };
+  btn.addEventListener('click', function(){ m.classList.toggle('open'); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') window.closeMNav(); });
   document.addEventListener('click', function(e){
-    if(!m.classList.contains('open')) return;
-    if(e.target===btn || btn.contains(e.target) || m.contains(e.target)) return;
+    if (!m.classList.contains('open')) return;
+    if (e.target === btn || btn.contains(e.target) || m.contains(e.target)) return;
     window.closeMNav();
   });
 })();
-(function(){if(!BC_SITE_ID)return;fetch('https://bitchatbot.io/get_chatbot_settings.php?site='+encodeURIComponent(BC_SITE_ID)).then(r=>r.json()).then(s=>{var name=(s.chatbot_name&&s.chatbot_name.trim())?s.chatbot_name:'Bitchat';var color=(s.primary_color&&s.primary_color.trim())?s.primary_color:'#5B5EF4';var label=document.getElementById('bc-btn-label');if(label)label.textContent=name;var btn=document.getElementById('bc-toggle-btn');if(btn){btn.style.background=color;btn.style.boxShadow='0 6px 24px '+color+'55';}}).catch(()=>{});})();
-function bcWidgetToggle(){bcOpen=!bcOpen;var wrap=document.getElementById('bc-frame-wrap'),chatIco=document.getElementById('bc-ico-chat'),closeIco=document.getElementById('bc-ico-close'),label=document.getElementById('bc-btn-label'),btn=document.getElementById('bc-toggle-btn');if(bcOpen){wrap.style.display='block';setTimeout(()=>{wrap.style.transform='scale(1) translateY(0)';wrap.style.opacity='1';},10);chatIco.style.display='none';closeIco.style.display='block';label.style.display='none';btn.style.padding='0 13px';btn.style.borderRadius='50%';btn.style.width='50px';btn.style.gap='0';}else{wrap.style.transform='scale(0.88) translateY(12px)';wrap.style.opacity='0';setTimeout(()=>{wrap.style.display='none';},320);chatIco.style.display='block';closeIco.style.display='none';label.style.display='inline';btn.style.padding='0 18px 0 13px';btn.style.borderRadius='50px';btn.style.width='auto';btn.style.gap='9px';}}
-function toggleFaq(btn){var answer=btn.nextElementSibling,icon=btn.querySelector('.faq-icon'),isOpen=answer.classList.contains('open');document.querySelectorAll('.faq-a').forEach(el=>el.classList.remove('open'));document.querySelectorAll('.faq-icon').forEach(el=>{el.classList.remove('open');el.textContent='+';});if(!isOpen){answer.classList.add('open');icon.classList.add('open');icon.textContent='+';}}
+
+// Load custom branding colors
+(function(){
+  if (!BC_SITE_ID) return;
+  fetch('https://bitchatbot.io/get_chatbot_settings.php?site=' + encodeURIComponent(BC_SITE_ID))
+    .then(function(r){ return r.json(); })
+    .then(function(s){
+      var name  = (s.chatbot_name  && s.chatbot_name.trim())  ? s.chatbot_name  : 'Bitchat';
+      var color = (s.primary_color && s.primary_color.trim()) ? s.primary_color : '#5B5EF4';
+      var label = document.getElementById('bc-btn-label');
+      if (label) label.textContent = name;
+      var toggleBtn = document.getElementById('bc-toggle-btn');
+      if (toggleBtn){ toggleBtn.style.background = color; toggleBtn.style.boxShadow = '0 6px 24px ' + color + '55'; }
+    }).catch(function(){});
+})();
+
+function bcWidgetToggle() {
+  bcOpen = !bcOpen;
+
+  var wrap     = document.getElementById('bc-frame-wrap');
+  var chatIco  = document.getElementById('bc-ico-chat');
+  var closeIco = document.getElementById('bc-ico-close');
+  var label    = document.getElementById('bc-btn-label');
+  var btn      = document.getElementById('bc-toggle-btn');
+
+  if (bcOpen) {
+    wrap.style.display = 'block';
+    setTimeout(function(){
+      wrap.style.transform = 'scale(1) translateY(0)';
+      wrap.style.opacity   = '1';
+    }, 10);
+
+    chatIco.style.display  = 'none';
+    closeIco.style.display = 'block';
+    label.style.display    = 'none';
+    btn.style.padding      = '0 13px';
+    btn.style.borderRadius = '50%';
+    btn.style.width        = '50px';
+    btn.style.gap          = '0';
+
+  } else {
+    wrap.style.transform = 'scale(0.88) translateY(12px)';
+    wrap.style.opacity   = '0';
+    setTimeout(function(){ wrap.style.display = 'none'; }, 320);
+
+    chatIco.style.display  = 'block';
+    closeIco.style.display = 'none';
+    label.style.display    = 'inline';
+    btn.style.padding      = '0 18px 0 13px';
+    btn.style.borderRadius = '50px';
+    btn.style.width        = 'auto';
+    btn.style.gap          = '9px';
+  }
+}
+function toggleFaq(btn) {
+  var answer = btn.nextElementSibling;
+  var icon   = btn.querySelector('.faq-icon');
+  var isOpen = answer.classList.contains('open');
+  document.querySelectorAll('.faq-a').forEach(function(el){ el.classList.remove('open'); });
+  document.querySelectorAll('.faq-icon').forEach(function(el){ el.classList.remove('open'); el.textContent = '+'; });
+  if (!isOpen) { answer.classList.add('open'); icon.classList.add('open'); icon.textContent = '+'; }
+}
 </script>
 </body>
 </html>

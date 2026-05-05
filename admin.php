@@ -291,8 +291,12 @@ tr.client-row:hover td { background:rgba(255,255,255,0.02); }
         <span style="font-weight:700;font-size:15px;color:white;">Bitchatbot Admin</span>
     </div>
     <span style="font-size:12.5px;color:var(--muted);"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
-    <a href="logout.php" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#F87171;padding:6px 14px;border-radius:8px;font-size:12.5px;font-weight:600;text-decoration:none;">Logout</a>
-</nav>
+<a href="dashboard.php?user_mode=1" style="background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.25);color:#67E8F9;padding:6px 14px;border-radius:8px;font-size:12.5px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:6px;">
+    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+    My Dashboard
+</a>
+<a href="logout.php" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#F87171;padding:6px 14px;border-radius:8px;font-size:12.5px;font-weight:600;text-decoration:none;">Logout</a>
+    </nav>
 
 <div style="display:flex;min-height:calc(100vh - 56px);">
 

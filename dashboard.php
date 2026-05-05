@@ -1,213 +1,238 @@
 <?php
-  require_once 'config/main_config.php';
+/*
+ * ══════════════════════════════════════════════════════════════════
+ *  dashboard.php — TOP PHP SECTION (replace everything BEFORE <!DOCTYPE html>)
+ *  Admin gets full access: no plan check, no expiry, no restrictions
+ * ══════════════════════════════════════════════════════════════════
+ */
 
-  if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in'])) {
-      header('Location: login.php'); exit();
-  }
+require_once 'config/main_config.php';
 
-  // Fresh user data from DB
-  $stmt = $conn->prepare("SELECT role, status, site_id, username, email, website_url, plan, upload_limit_mb, coupon_code, coupon_expires_at, max_chatbots, stripe_subscription_id, plan_start_date, plan_expiry_date, email_consent FROM users WHERE id = ?");
-  $stmt->bind_param("i", $_SESSION['user_id']);
-  $stmt->execute();
-  $row = $stmt->get_result()->fetch_assoc();
-  $stmt->close();
-  if ($row) { foreach ($row as $k => $v) $_SESSION[$k] = $v; }
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in'])) {
+    header('Location: login.php'); exit();
+}
 
-  if ($_SESSION['role'] === 'admin') { header('Location: admin.php'); exit(); }
+// ── Fresh user data from DB ──
+$stmt = $conn->prepare("SELECT role, status, site_id, username, email, website_url, plan, upload_limit_mb, coupon_code, coupon_expires_at, max_chatbots, stripe_subscription_id, plan_start_date, plan_expiry_date, email_consent FROM users WHERE id = ?");
+$stmt->bind_param("i", $_SESSION['user_id']);
+$stmt->execute();
+$row = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+if ($row) { foreach ($row as $k => $v) $_SESSION[$k] = $v; }
 
-  $current_plan = $_SESSION['plan'] ?? '';
-  if (empty($current_plan) || $current_plan === 'none') {
-      header('Location: select_plan.php'); exit();
-  }
+$is_admin = ($_SESSION['role'] === 'admin');
 
-  // ── Plan Expiry Check ──
-  $plan_expired = false;
-  $days_left = 999;
-  $plan_expiry_date = $_SESSION['plan_expiry_date'] ?? null;
+// ── Admin: redirect to admin.php UNLESS ?user_mode=1 is set ──
+if ($is_admin && !isset($_GET['user_mode'])) {
+    header('Location: admin.php'); exit();
+}
 
-  if ($plan_expiry_date) {
-      $expiry = new DateTime($plan_expiry_date);
-      $today = new DateTime();
-      $today->setTime(0, 0, 0);
-      if ($expiry < $today) { $plan_expired = true; $days_left = 0; }
-      else { $diff = $today->diff($expiry); $days_left = $diff->days; }
-  }
+// ── Non-admin: plan check ──
+if (!$is_admin) {
+    $current_plan = $_SESSION['plan'] ?? '';
+    if (empty($current_plan) || $current_plan === 'none') {
+        header('Location: select_plan.php'); exit();
+    }
+}
 
-  if ($plan_expired && $_SESSION['role'] !== 'admin') {
-      header('Location: select_plan.php?renew=1'); exit();
-  }
+// ── Plan Expiry Check (skip for admin) ──
+$plan_expired = false;
+$days_left = 999;
+$plan_expiry_date = $_SESSION['plan_expiry_date'] ?? null;
 
-  if ($_SESSION['status'] === 'pending') {
-      $auto_upd = $conn->prepare("UPDATE users SET status='approved' WHERE id=?");
-      $auto_upd->bind_param("i", $_SESSION['user_id']); $auto_upd->execute(); $auto_upd->close();
-      $_SESSION['status'] = 'approved';
-  }
+if (!$is_admin && $plan_expiry_date) {
+    $expiry = new DateTime($plan_expiry_date);
+    $today  = new DateTime();
+    $today->setTime(0, 0, 0);
+    if ($expiry < $today) { $plan_expired = true; $days_left = 0; }
+    else { $diff = $today->diff($expiry); $days_left = $diff->days; }
+}
 
-  if ($_SESSION['status'] === 'banned') { ?>
-  <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Account Banned — Bitchat</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script></head>
-  <body class="bg-[#070709] min-h-screen flex items-center justify-center" style="font-family:'DM Sans',sans-serif">
-  <div class="text-center max-w-md mx-auto px-6">
-      <div class="w-16 h-16 rounded-2xl flex items-center justify-content mx-auto mb-6" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);">
-          <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-      </div>
-      <h1 class="text-xl font-bold text-white mb-2">Account Suspended</h1>
-      <p class="text-sm text-gray-500 mb-6">Your account <strong class="text-white"><?php echo htmlspecialchars($_SESSION['username']); ?></strong> has been suspended.</p>
-      <a href="logout.php" class="inline-block text-sm font-medium text-gray-400 hover:text-white transition px-5 py-2.5 rounded-xl" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);">Sign out</a>
-  </div></body></html>
-  <?php exit(); }
+if ($plan_expired && !$is_admin) {
+    header('Location: select_plan.php?renew=1'); exit();
+}
 
-  // ── Plan limits ──
-  $plan_limits = ['basic' => 1, 'starter' => 5, 'pro' => 10];
-  $max_sites   = $plan_limits[$_SESSION['plan'] ?? 'basic'] ?? 1;
+// ── Status checks (skip for admin) ──
+if (!$is_admin && $_SESSION['status'] === 'pending') {
+    $auto_upd = $conn->prepare("UPDATE users SET status='approved' WHERE id=?");
+    $auto_upd->bind_param("i", $_SESSION['user_id']); $auto_upd->execute(); $auto_upd->close();
+    $_SESSION['status'] = 'approved';
+}
 
-  // ── Load all sites for this user ──
-  $sites_stmt = $conn->prepare("SELECT site_id, site_name, website_url, has_data, qa_count, created_at FROM sites WHERE user_id=? ORDER BY created_at ASC");
-  $sites_stmt->bind_param("i", $_SESSION['user_id']); $sites_stmt->execute();
-  $user_sites = $sites_stmt->get_result()->fetch_all(MYSQLI_ASSOC); $sites_stmt->close();
+if (!$is_admin && $_SESSION['status'] === 'banned') { ?>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Account Banned — Bitchat</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-[#070709] min-h-screen flex items-center justify-center" style="font-family:'DM Sans',sans-serif">
+<div class="text-center max-w-md mx-auto px-6">
+    <div class="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);">
+        <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+    </div>
+    <h1 class="text-xl font-bold text-white mb-2">Account Suspended</h1>
+    <p class="text-sm text-gray-500 mb-6">Your account <strong class="text-white"><?php echo htmlspecialchars($_SESSION['username']); ?></strong> has been suspended.</p>
+    <a href="logout.php" class="inline-block text-sm font-medium text-gray-400 hover:text-white transition px-5 py-2.5 rounded-xl" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);">Sign out</a>
+</div></body></html>
+<?php exit(); }
 
-  // If no sites exist yet, create default from legacy site_id
-  if (empty($user_sites) && !empty($_SESSION['site_id'])) {
-      $legacy_id   = $_SESSION['site_id'];
-      $legacy_name = ($_SESSION['username'] ?? 'user') . '_site1';
-      $has_d = 0;
-      $uc = $conn->prepare("SELECT COUNT(*) as c FROM uploads WHERE user_id=?");
-      $uc->bind_param("i", $_SESSION['user_id']); $uc->execute();
-      $has_d = $uc->get_result()->fetch_assoc()['c'] > 0 ? 1 : 0; $uc->close();
+// ── Plan limits ──
+// Admin gets unlimited sites (999). Users get plan-based limits.
+$plan_limits = ['basic' => 1, 'starter' => 5, 'pro' => 10];
+if ($is_admin) {
+    $max_sites = 999; // Admin: unlimited
+} else {
+    $max_sites = $plan_limits[$_SESSION['plan'] ?? 'basic'] ?? 1;
+}
 
-      $ins = $conn->prepare("INSERT IGNORE INTO sites (user_id, site_id, site_name, has_data, created_at) VALUES (?,?,?,?,NOW())");
-      $ins->bind_param("issi", $_SESSION['user_id'], $legacy_id, $legacy_name, $has_d); $ins->execute(); $ins->close();
+// ── Load all sites for this user ──
+$sites_stmt = $conn->prepare("SELECT site_id, site_name, website_url, has_data, qa_count, created_at FROM sites WHERE user_id=? ORDER BY created_at ASC");
+$sites_stmt->bind_param("i", $_SESSION['user_id']); $sites_stmt->execute();
+$user_sites = $sites_stmt->get_result()->fetch_all(MYSQLI_ASSOC); $sites_stmt->close();
 
-      $sites_stmt2 = $conn->prepare("SELECT site_id, site_name, website_url, has_data, qa_count, created_at FROM sites WHERE user_id=? ORDER BY created_at ASC");
-      $sites_stmt2->bind_param("i", $_SESSION['user_id']); $sites_stmt2->execute();
-      $user_sites = $sites_stmt2->get_result()->fetch_all(MYSQLI_ASSOC); $sites_stmt2->close();
-  }
+// If no sites exist yet, create default from legacy site_id
+if (empty($user_sites) && !empty($_SESSION['site_id'])) {
+    $legacy_id   = $_SESSION['site_id'];
+    $legacy_name = ($_SESSION['username'] ?? 'user') . '_site1';
+    $has_d = 0;
+    $uc = $conn->prepare("SELECT COUNT(*) as c FROM uploads WHERE user_id=?");
+    $uc->bind_param("i", $_SESSION['user_id']); $uc->execute();
+    $has_d = $uc->get_result()->fetch_assoc()['c'] > 0 ? 1 : 0; $uc->close();
 
-  $has_any_site = !empty($user_sites);
+    $ins = $conn->prepare("INSERT IGNORE INTO sites (user_id, site_id, site_name, has_data, created_at) VALUES (?,?,?,?,NOW())");
+    $ins->bind_param("issi", $_SESSION['user_id'], $legacy_id, $legacy_name, $has_d); $ins->execute(); $ins->close();
 
-  // ── Active site from URL param or first ──
-  $active_site_id = $_GET['site'] ?? ($user_sites[0]['site_id'] ?? '');
-  $active_site    = null;
-  foreach ($user_sites as $s) {
-      if ($s['site_id'] === $active_site_id) { $active_site = $s; break; }
-  }
-  if (!$active_site && !empty($user_sites)) {
-      $active_site    = $user_sites[0];
-      $active_site_id = $user_sites[0]['site_id'];
-  }
+    $sites_stmt2 = $conn->prepare("SELECT site_id, site_name, website_url, has_data, qa_count, created_at FROM sites WHERE user_id=? ORDER BY created_at ASC");
+    $sites_stmt2->bind_param("i", $_SESSION['user_id']); $sites_stmt2->execute();
+    $user_sites = $sites_stmt2->get_result()->fetch_all(MYSQLI_ASSOC); $sites_stmt2->close();
+}
 
-  // POST: Apply Coupon
-  if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['apply_coupon'])) {
-      $code = trim($_POST['coupon_code'] ?? '');
-      $cpn = $conn->prepare("SELECT * FROM coupons WHERE code = ? AND is_active = 1 AND used_count < max_uses AND (expires_at IS NULL OR expires_at > NOW())");
-      $cpn->bind_param("s", $code); $cpn->execute();
-      $cpn_row = $cpn->get_result()->fetch_assoc(); $cpn->close();
-      if ($cpn_row) {
-          $exp = date('Y-m-d H:i:s', strtotime('+' . $cpn_row['duration_days'] . ' days'));
-          $upd = $conn->prepare("UPDATE users SET plan=?, upload_limit_mb=?, coupon_code=?, coupon_expires_at=? WHERE id=?");
-          $upd->bind_param("sissi", $cpn_row['plan'], $cpn_row['upload_limit_mb'], $code, $exp, $_SESSION['user_id']);
-          $upd->execute(); $upd->close();
-          $conn->query("UPDATE coupons SET used_count=used_count+1 WHERE code='".addslashes($code)."'");
-          $_SESSION['plan'] = $cpn_row['plan'];
-          $_SESSION['upload_limit_mb'] = $cpn_row['upload_limit_mb'];
-          $_SESSION['coupon_expires_at'] = $exp;
-      }
-  }
+$has_any_site = !empty($user_sites);
 
-  // ── Variables ──
-  $username      = $_SESSION['username'];
-  $email         = $_SESSION['email'];
-  $user_id       = $_SESSION['user_id'];
-  $plan          = $_SESSION['plan'] ?? 'basic';
-  $upload_limit  = $_SESSION['upload_limit_mb'] ?? 5;
-  $coupon_exp    = $_SESSION['coupon_expires_at'] ?? null;
-  $stripe_sub_id = $_SESSION['stripe_subscription_id'] ?? '';
-  $email_consent = $_SESSION['email_consent'] ?? 0;
+// ── Active site from URL param or first ──
+$active_site_id = $_GET['site'] ?? ($user_sites[0]['site_id'] ?? '');
+$active_site    = null;
+foreach ($user_sites as $s) {
+    if ($s['site_id'] === $active_site_id) { $active_site = $s; break; }
+}
+if (!$active_site && !empty($user_sites)) {
+    $active_site    = $user_sites[0];
+    $active_site_id = $user_sites[0]['site_id'];
+}
 
-  $coupon_active = false; $coupon_days_left = 0;
-  if ($coupon_exp) {
-      $diff = strtotime($coupon_exp) - time();
-      if ($diff > 0) { $coupon_active = true; $coupon_days_left = ceil($diff / 86400); }
-  }
+// POST: Apply Coupon (non-admin only)
+if (!$is_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['apply_coupon'])) {
+    $code = trim($_POST['coupon_code'] ?? '');
+    $cpn = $conn->prepare("SELECT * FROM coupons WHERE code = ? AND is_active = 1 AND used_count < max_uses AND (expires_at IS NULL OR expires_at > NOW())");
+    $cpn->bind_param("s", $code); $cpn->execute();
+    $cpn_row = $cpn->get_result()->fetch_assoc(); $cpn->close();
+    if ($cpn_row) {
+        $exp = date('Y-m-d H:i:s', strtotime('+' . $cpn_row['duration_days'] . ' days'));
+        $upd = $conn->prepare("UPDATE users SET plan=?, upload_limit_mb=?, coupon_code=?, coupon_expires_at=? WHERE id=?");
+        $upd->bind_param("sissi", $cpn_row['plan'], $cpn_row['upload_limit_mb'], $code, $exp, $_SESSION['user_id']);
+        $upd->execute(); $upd->close();
+        $conn->query("UPDATE coupons SET used_count=used_count+1 WHERE code='".addslashes($code)."'");
+        $_SESSION['plan'] = $cpn_row['plan'];
+        $_SESSION['upload_limit_mb'] = $cpn_row['upload_limit_mb'];
+        $_SESSION['coupon_expires_at'] = $exp;
+    }
+}
 
-  $plan_prices   = ['basic'=>'$10/mo','starter'=>'$20/mo','pro'=>'$30/mo'];
-  $plan_agents   = ['basic'=>1,'starter'=>5,'pro'=>10];
-  $plan_has_cust = in_array($plan, ['starter','pro']);
+// ── Variables ──
+$username      = $_SESSION['username'];
+$email         = $_SESSION['email'];
+$user_id       = $_SESSION['user_id'];
+$plan          = $is_admin ? 'admin' : ($_SESSION['plan'] ?? 'basic');
+$upload_limit  = $is_admin ? 999 : ($_SESSION['upload_limit_mb'] ?? 5); // Admin: unlimited upload
+$coupon_exp    = $_SESSION['coupon_expires_at'] ?? null;
+$stripe_sub_id = $_SESSION['stripe_subscription_id'] ?? '';
+$email_consent = $_SESSION['email_consent'] ?? 0;
 
-  // ── Active site data ──
-  $site_id  = $active_site_id;
-  $has_data = ($active_site['has_data'] ?? 0) == 1;
+$coupon_active = false; $coupon_days_left = 0;
+if (!$is_admin && $coupon_exp) {
+    $diff = strtotime($coupon_exp) - time();
+    if ($diff > 0) { $coupon_active = true; $coupon_days_left = ceil($diff / 86400); }
+}
 
-  // Load chats for active site
-  $chats = [];
-  if ($site_id) {
-      $stmt = $conn->prepare("SELECT id, session_id, user_msg, bot_reply, created_at FROM chat_history WHERE site_id = ? ORDER BY created_at ASC LIMIT 500");
-      $stmt->bind_param("s", $site_id); $stmt->execute();
-      $chats = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
-  }
+$plan_prices   = ['basic'=>'$10/mo','starter'=>'$20/mo','pro'=>'$30/mo','admin'=>'Admin'];
+$plan_agents   = ['basic'=>1,'starter'=>5,'pro'=>10,'admin'=>999];
 
-  $sessions = [];
-  foreach ($chats as $chat) {
-      $sid = $chat['session_id'] ?: 'unknown';
-      if (!isset($sessions[$sid])) {
-          $sessions[$sid] = ['messages'=>[],'first_time'=>$chat['created_at'],'last_time'=>$chat['created_at']];
-      }
-      $sessions[$sid]['messages'][] = $chat;
-      $sessions[$sid]['last_time']  = $chat['created_at'];
-  }
-  uasort($sessions, fn($a,$b) => strtotime($b['last_time']) - strtotime($a['last_time']));
+// Admin always has customization access
+$plan_has_cust = $is_admin ? true : in_array($plan, ['starter','pro']);
 
-  $total_chats    = count($chats);
-  $total_sessions = count($sessions);
+// ── Active site data ──
+$site_id  = $active_site_id;
+$has_data = ($active_site['has_data'] ?? 0) == 1;
 
-  // Uploads for active site
-  $uploads = [];
-  $ustmt = $conn->prepare("SELECT filename, file_size_kb, qa_count, status, created_at FROM uploads WHERE user_id = ? AND site_id = ? ORDER BY created_at DESC LIMIT 10");
-  if ($ustmt) {
-      $ustmt->bind_param("is", $user_id, $site_id); $ustmt->execute();
-      $uploads = $ustmt->get_result()->fetch_all(MYSQLI_ASSOC); $ustmt->close();
-  }
+// Load chats for active site
+$chats = [];
+if ($site_id) {
+    $stmt = $conn->prepare("SELECT id, session_id, user_msg, bot_reply, created_at FROM chat_history WHERE site_id = ? ORDER BY created_at ASC LIMIT 500");
+    $stmt->bind_param("s", $site_id); $stmt->execute();
+    $chats = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+}
 
-  $recent_chats = array_slice(array_reverse($chats), 0, 5);
+$sessions = [];
+foreach ($chats as $chat) {
+    $sid = $chat['session_id'] ?: 'unknown';
+    if (!isset($sessions[$sid])) {
+        $sessions[$sid] = ['messages'=>[],'first_time'=>$chat['created_at'],'last_time'=>$chat['created_at']];
+    }
+    $sessions[$sid]['messages'][] = $chat;
+    $sessions[$sid]['last_time']  = $chat['created_at'];
+}
+uasort($sessions, fn($a,$b) => strtotime($b['last_time']) - strtotime($a['last_time']));
 
-  $customData = ['chatbot_name' => 'Bitchat Assistant', 'primary_color' => '#6C3CE1'];
-  if ($plan_has_cust) {
-      $cstmt = $conn->prepare("SELECT chatbot_name, primary_color FROM chatbot_settings WHERE user_id = ? AND site_id = ?");
-      if ($cstmt) {
-          $cstmt->bind_param("is", $user_id, $site_id); $cstmt->execute();
-          $crow = $cstmt->get_result()->fetch_assoc(); $cstmt->close();
-          if ($crow) $customData = array_merge($customData, $crow);
-      }
-  }
+$total_chats    = count($chats);
+$total_sessions = count($sessions);
 
-  // Per-site settings: load chatbot_settings for every site
-  $all_site_settings = [];
-  if (!empty($user_sites)) {
-      $placeholders = implode(',', array_fill(0, count($user_sites), '?'));
-      $site_ids_arr = array_column($user_sites, 'site_id');
-      $types = str_repeat('s', count($site_ids_arr));
-      $ss_stmt = $conn->prepare("SELECT site_id, chatbot_name, primary_color, greeting_msg FROM chatbot_settings WHERE user_id = ? AND site_id IN ($placeholders)");
-      if ($ss_stmt) {
-          $params = array_merge([$user_id], $site_ids_arr);
-          $types_full = 'i' . $types;
-          $ss_stmt->bind_param($types_full, ...$params);
-          $ss_stmt->execute();
-          $ss_result = $ss_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-          foreach ($ss_result as $sr) $all_site_settings[$sr['site_id']] = $sr;
-          $ss_stmt->close();
-      }
-  }
+// Uploads for active site
+$uploads = [];
+$ustmt = $conn->prepare("SELECT filename, file_size_kb, qa_count, status, created_at FROM uploads WHERE user_id = ? AND site_id = ? ORDER BY created_at DESC LIMIT 10");
+if ($ustmt) {
+    $ustmt->bind_param("is", $user_id, $site_id); $ustmt->execute();
+    $uploads = $ustmt->get_result()->fetch_all(MYSQLI_ASSOC); $ustmt->close();
+}
 
-  $plan_cfg = [
-      'basic'   => ['color'=>'#94A3B8','bg'=>'rgba(148,163,184,0.08)','border'=>'rgba(148,163,184,0.15)','label'=>'Basic'],
-      'free'    => ['color'=>'#94A3B8','bg'=>'rgba(148,163,184,0.08)','border'=>'rgba(148,163,184,0.15)','label'=>'Free'],
-      'starter' => ['color'=>'#818CF8','bg'=>'rgba(129,140,248,0.08)','border'=>'rgba(129,140,248,0.15)','label'=>'Starter'],
-      'pro'     => ['color'=>'#38BDF8','bg'=>'rgba(56,189,248,0.08)','border'=>'rgba(56,189,248,0.15)','label'=>'Pro'],
-  ];
-  $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
-  ?>
-  <!DOCTYPE html>
+$recent_chats = array_slice(array_reverse($chats), 0, 5);
+
+$customData = ['chatbot_name' => 'Bitchat Assistant', 'primary_color' => '#6C3CE1'];
+if ($plan_has_cust && $site_id) {
+    $cstmt = $conn->prepare("SELECT chatbot_name, primary_color FROM chatbot_settings WHERE user_id = ? AND site_id = ?");
+    if ($cstmt) {
+        $cstmt->bind_param("is", $user_id, $site_id); $cstmt->execute();
+        $crow = $cstmt->get_result()->fetch_assoc(); $cstmt->close();
+        if ($crow) $customData = array_merge($customData, $crow);
+    }
+}
+
+// Per-site settings
+$all_site_settings = [];
+if (!empty($user_sites)) {
+    $placeholders = implode(',', array_fill(0, count($user_sites), '?'));
+    $site_ids_arr = array_column($user_sites, 'site_id');
+    $types = str_repeat('s', count($site_ids_arr));
+    $ss_stmt = $conn->prepare("SELECT site_id, chatbot_name, primary_color, greeting_msg FROM chatbot_settings WHERE user_id = ? AND site_id IN ($placeholders)");
+    if ($ss_stmt) {
+        $params = array_merge([$user_id], $site_ids_arr);
+        $types_full = 'i' . $types;
+        $ss_stmt->bind_param($types_full, ...$params);
+        $ss_stmt->execute();
+        $ss_result = $ss_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        foreach ($ss_result as $sr) $all_site_settings[$sr['site_id']] = $sr;
+        $ss_stmt->close();
+    }
+}
+
+// Plan chip color config — added 'admin' entry
+$plan_cfg = [
+    'basic'   => ['color'=>'#94A3B8','bg'=>'rgba(148,163,184,0.08)','border'=>'rgba(148,163,184,0.15)','label'=>'Basic'],
+    'free'    => ['color'=>'#94A3B8','bg'=>'rgba(148,163,184,0.08)','border'=>'rgba(148,163,184,0.15)','label'=>'Free'],
+    'starter' => ['color'=>'#818CF8','bg'=>'rgba(129,140,248,0.08)','border'=>'rgba(129,140,248,0.15)','label'=>'Starter'],
+    'pro'     => ['color'=>'#38BDF8','bg'=>'rgba(56,189,248,0.08)','border'=>'rgba(56,189,248,0.15)','label'=>'Pro'],
+    'admin'   => ['color'=>'#F59E0B','bg'=>'rgba(245,158,11,0.12)','border'=>'rgba(245,158,11,0.25)','label'=>'Admin'],
+];
+$pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
+?>
+<!DOCTYPE html>
   <html lang="en">
   <head>
   <meta charset="UTF-8">
@@ -369,7 +394,13 @@
     </div>
     <div class="plan-chip" style="background:<?php echo $pc['bg'];?>;color:<?php echo $pc['color'];?>;border:1px solid <?php echo $pc['border'];?>;"><?php echo strtoupper($plan); ?></div>
     <?php if($coupon_active): ?><div style="font-size:11px;color:var(--green);background:var(--green-bg);border:1px solid var(--green-border);padding:3px 10px;border-radius:20px;font-family:'DM Mono',monospace;"><?php echo $coupon_days_left; ?>d coupon</div><?php endif; ?>
-    <div style="display:flex;align-items:center;gap:10px;">
+<div style="display:flex;align-items:center;gap:10px;">
+      <?php if($is_admin): ?>
+      <a href="admin.php" style="font-size:12px;color:#F59E0B;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);padding:6px 14px;border-radius:8px;text-decoration:none;font-weight:600;display:flex;align-items:center;gap:6px;">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        Admin Panel
+      </a>
+      <?php endif; ?>
       <p style="font-size:13px;font-weight:600;color:white;"><?php echo htmlspecialchars($username); ?></p>
       <a href="logout.php" class="btn-logout">Sign out</a>
     </div>
@@ -410,8 +441,8 @@
       </a>
       <?php endforeach; ?>
 
-      <?php if(count($user_sites) < $max_sites): ?>
-      <button class="add-site-btn" onclick="openAddSiteModal()">
+<?php if($is_admin || count($user_sites) < $max_sites): ?>
+        <button class="add-site-btn" onclick="openAddSiteModal()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
         Add Site
       </button>
@@ -468,7 +499,7 @@
       Settings
     </button>
 
-    <?php if($plan === 'basic'): ?>
+    <?php if($plan === 'basic' && !$is_admin): ?>
     <div style="margin-top:auto;padding:16px 12px;">
       <div style="background:var(--accent-glow);border:1px solid var(--accent-border);border-radius:var(--radius);padding:14px;text-align:center;">
         <p style="font-size:12px;font-weight:700;color:#A5B4FC;margin-bottom:4px;">Upgrade to Starter</p>
@@ -755,126 +786,227 @@
   </section>
 
   <!-- ════════════════ SETTINGS ════════════════ -->
-  <section id="settings-section" style="display:none;">
-    <div class="section-header">
-      <h1 class="section-title">Settings</h1>
-      <p class="section-sub">Account, plan and per-site management</p>
+<section id="settings-section" style="display:none;">
+  <div class="section-header">
+    <h1 class="section-title">Settings</h1>
+    <p class="section-sub">Account, plan and per-site management</p>
+  </div>
+
+  <!-- ── Inner tab bar ── -->
+  <div style="display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:4px;width:fit-content;margin-bottom:24px;">
+    <button onclick="switchSettingsTab('general',this)" id="stab-general"
+      style="padding:7px 20px;border-radius:10px;font-size:13px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text);font-weight:600;font-family:'DM Sans',sans-serif;transition:all .15s;">
+      General Settings
+    </button>
+    <button onclick="switchSettingsTab('sites',this)" id="stab-sites"
+      style="padding:7px 20px;border-radius:10px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--text-muted);font-family:'DM Sans',sans-serif;transition:all .15s;">
+      Site Settings
+    </button>
+  </div>
+
+  <!-- ══ GENERAL SETTINGS TAB ══ -->
+  <div id="spanel-general" style="max-width:620px;display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Account Info -->
+    <div class="settings-card">
+      <div class="settings-card-header">
+        <p style="font-size:13.5px;font-weight:700;color:white;">Account Information</p>
+      </div>
+      <div class="settings-card-body">
+        <div class="info-row"><span class="info-label">Username</span><span class="info-val"><?php echo htmlspecialchars($username); ?></span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-val"><?php echo htmlspecialchars($email); ?></span></div>
+        <div class="info-row"><span class="info-label">Plan</span><span class="plan-chip" style="background:<?php echo $pc['bg'];?>;color:<?php echo $pc['color'];?>;border:1px solid <?php echo $pc['border'];?>;"><?php echo strtoupper($plan); ?></span></div>
+        <div class="info-row"><span class="info-label">Sites Used</span><span class="info-val"><?php echo count($user_sites); ?> / <?php echo $max_sites; ?></span></div>
+      </div>
     </div>
-    <div style="max-width:620px;display:flex;flex-direction:column;gap:16px;">
 
-      <!-- Account Info -->
-      <div class="settings-card">
-        <div class="settings-card-header"><p style="font-size:13.5px;font-weight:700;color:white;">Account Information</p></div>
-        <div class="settings-card-body">
-          <div class="info-row"><span class="info-label">Username</span><span class="info-val"><?php echo htmlspecialchars($username); ?></span></div>
-          <div class="info-row"><span class="info-label">Email</span><span class="info-val"><?php echo htmlspecialchars($email); ?></span></div>
-          <div class="info-row"><span class="info-label">Plan</span><span class="plan-chip" style="background:<?php echo $pc['bg'];?>;color:<?php echo $pc['color'];?>;border:1px solid <?php echo $pc['border'];?>;"><?php echo strtoupper($plan); ?></span></div>
-          <div class="info-row"><span class="info-label">Sites Used</span><span class="info-val"><?php echo count($user_sites); ?> / <?php echo $max_sites; ?></span></div>
-        </div>
+    <!-- Plan Info -->
+    <div class="settings-card">
+      <div class="settings-card-header">
+        <p style="font-size:13.5px;font-weight:700;color:white;">Plan Details</p>
+        <a href="select_plan.php?upgrade=1" class="btn btn-secondary" style="font-size:12px;padding:6px 14px;">Manage Plan</a>
       </div>
-
-      <!-- Plan Info -->
-      <div class="settings-card">
-        <div class="settings-card-header">
-          <p style="font-size:13.5px;font-weight:700;color:white;">Plan Details</p>
-          <a href="select_plan.php?upgrade=1" class="btn btn-secondary" style="font-size:12px;padding:6px 14px;">Manage Plan</a>
+      <div class="settings-card-body">
+        <div class="info-row"><span class="info-label">Current Plan</span><span class="info-val" style="font-weight:700;"><?php echo strtoupper($plan); ?> — <?php echo $plan_prices[$plan]??''; ?></span></div>
+        <div class="info-row">
+          <span class="info-label">Plan Status</span>
+          <span class="info-val" style="font-weight:700;color:<?php echo $plan_expired?'var(--red)':($days_left<=5?'var(--amber)':'var(--green)'); ?>;">
+            <?php echo $plan_expired?'Expired':$days_left.' days remaining'; ?>
+          </span>
         </div>
-        <div class="settings-card-body">
-          <div class="info-row"><span class="info-label">Current Plan</span><span class="info-val" style="font-weight:700;"><?php echo strtoupper($plan); ?> — <?php echo $plan_prices[$plan]??''; ?></span></div>
-          <div class="info-row"><span class="info-label">Plan Status</span><span class="info-val" style="font-weight:700;color:<?php echo $plan_expired?'var(--red)':($days_left<=5?'var(--amber)':'var(--green)'); ?>;"><?php echo $plan_expired?'Expired':$days_left.' days remaining'; ?></span></div>
-          <?php if($plan_expiry_date): ?>
-          <div class="info-row"><span class="info-label">Expiry Date</span><span class="info-val"><?php echo date('d M Y', strtotime($plan_expiry_date)); ?></span></div>
-          <?php endif; ?>
-          <div class="info-row"><span class="info-label">Max Sites</span><span class="info-val"><?php echo $max_sites; ?></span></div>
-          <div class="info-row"><span class="info-label">Upload Limit</span><span class="info-val"><?php echo $upload_limit; ?> MB per site</span></div>
-        </div>
-      </div>
-
-      <!-- Per-Site Settings -->
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div>
-            <p style="font-size:15px;font-weight:700;color:white;">Site Settings</p>
-            <p style="font-size:12px;color:var(--text-muted);margin-top:3px;">Each site has independent configuration</p>
-          </div>
-          <?php if(count($user_sites) < $max_sites): ?>
-          <button onclick="openAddSiteModal()" class="btn btn-secondary" style="font-size:12px;padding:6px 14px;">+ Add Site</button>
-          <?php endif; ?>
-        </div>
-
-        <?php if(empty($user_sites)): ?>
-        <div class="settings-card" style="padding:32px;text-align:center;">
-          <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">No sites yet. Add your first site to get started.</p>
-          <button onclick="openAddSiteModal()" class="btn btn-primary" style="font-size:13px;">Add Your First Site</button>
-        </div>
-        <?php else: ?>
-        <?php foreach($user_sites as $i => $s):
-          $s_settings = $all_site_settings[$s['site_id']] ?? [];
-          $s_chatbot_name = $s_settings['chatbot_name'] ?? 'Bitchat Assistant';
-          $s_color = $s_settings['primary_color'] ?? '#6C3CE1';
-        ?>
-        <div class="site-settings-block">
-          <div class="site-settings-header" onclick="toggleSiteSettings('site-body-<?php echo $i; ?>', this)">
-            <div style="width:10px;height:10px;border-radius:50%;background:<?php echo $s['has_data']?'var(--green)':'var(--amber)';?>;flex-shrink:0;<?php echo $s['has_data']?'box-shadow:0 0 5px var(--green)':''; ?>"></div>
-            <div style="flex:1;min-width:0;">
-              <p style="font-size:14px;font-weight:700;color:white;"><?php echo htmlspecialchars($s['site_name']); ?></p>
-              <p style="font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;margin-top:2px;"><?php echo htmlspecialchars($s['site_id']); ?></p>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-              <span class="tag <?php echo $s['has_data']?'tag-success':'tag-warn'; ?>"><?php echo $s['has_data']?'Active':'No Data'; ?></span>
-              <span class="tag" style="background:var(--surface3);color:var(--text-muted);border:1px solid var(--border);">#<?php echo $i+1; ?></span>
-            </div>
-            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-          </div>
-          <div class="site-settings-body" id="site-body-<?php echo $i; ?>">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-              <div class="info-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:0;">
-                <span class="info-label" style="margin-bottom:0;">Site Name</span>
-                <span class="info-val"><?php echo htmlspecialchars($s['site_name']); ?></span>
-              </div>
-              <div class="info-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:0;">
-                <span class="info-label" style="margin-bottom:0;">Domain Restriction</span>
-                <span class="info-val" style="font-size:12px;"><?php echo $s['website_url']?'🔒 '.htmlspecialchars($s['website_url']):'<span style="color:var(--text-muted);">None (works anywhere)</span>'; ?></span>
-              </div>
-              <div class="info-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:0;">
-                <span class="info-label" style="margin-bottom:0;">Data Status</span>
-                <span class="info-val" style="color:<?php echo $s['has_data']?'var(--green)':'var(--amber)'; ?>;"><?php echo $s['has_data']?'✅ Knowledge base loaded':'⏳ No data uploaded'; ?></span>
-              </div>
-              <?php if($plan_has_cust): ?>
-              <div class="info-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:0;">
-                <span class="info-label" style="margin-bottom:0;">Chatbot Name</span>
-                <span class="info-val"><?php echo htmlspecialchars($s_chatbot_name); ?></span>
-              </div>
-              <?php endif; ?>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border-soft);">
-              <button onclick="openEditSiteModal('<?php echo htmlspecialchars(addslashes($s['site_id'])); ?>','<?php echo htmlspecialchars(addslashes($s['site_name'])); ?>','<?php echo htmlspecialchars(addslashes($s['website_url']??'')); ?>')" class="btn btn-secondary" style="font-size:12px;padding:7px 14px;">
-                ✏️ Edit Site
-              </button>
-              <a href="?site=<?php echo urlencode($s['site_id']); ?>&section=upload" onclick="event.preventDefault();window.location.href='?site=<?php echo urlencode($s['site_id']); ?>';setTimeout(()=>showSection('upload'),400);" class="btn btn-secondary" style="font-size:12px;padding:7px 14px;text-decoration:none;">
-                📤 Upload Data
-              </a>
-              <?php if($plan_has_cust): ?>
-              <a href="chatbot_customize.php?site=<?php echo urlencode($s['site_id']); ?>" class="btn btn-secondary" style="font-size:12px;padding:7px 14px;text-decoration:none;">🎨 Customize</a>
-              <?php endif; ?>
-              <a href="?site=<?php echo urlencode($s['site_id']); ?>&section=embed" onclick="event.preventDefault();window.location.href='?site=<?php echo urlencode($s['site_id']); ?>';setTimeout(()=>showSection('embed'),400);" class="btn btn-secondary" style="font-size:12px;padding:7px 14px;text-decoration:none;">
-                &lt;/&gt; Embed Code
-              </a>
-              <?php if(count($user_sites) > 1): ?>
-              <button onclick="deleteSite('<?php echo htmlspecialchars(addslashes($s['site_id'])); ?>')" class="btn btn-danger" style="font-size:12px;padding:7px 14px;margin-left:auto;">
-                🗑️ Delete Site
-              </button>
-              <?php endif; ?>
-            </div>
-          </div>
-        </div>
-        <?php endforeach; ?>
+        <?php if($plan_expiry_date): ?>
+        <div class="info-row"><span class="info-label">Expiry Date</span><span class="info-val"><?php echo date('d M Y', strtotime($plan_expiry_date)); ?></span></div>
         <?php endif; ?>
+        <div class="info-row"><span class="info-label">Max Sites</span><span class="info-val"><?php echo $max_sites; ?></span></div>
+        <div class="info-row"><span class="info-label">Upload Limit</span><span class="info-val"><?php echo $upload_limit; ?> MB per site</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ SITE SETTINGS TAB ══ -->
+  <div id="spanel-sites" style="max-width:680px;display:none;flex-direction:column;gap:0;">
+
+    <!-- Header row -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div>
+        <p style="font-size:15px;font-weight:700;color:white;">My Sites</p>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:3px;"><?php echo count($user_sites); ?> of <?php echo $max_sites; ?> sites used</p>
+      </div>
+<?php if($is_admin || count($user_sites) < $max_sites): ?>
+        <button onclick="openAddSiteModal()" class="btn btn-primary" style="font-size:12px;padding:8px 18px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+        Add Site
+      </button>
+      <?php else: ?>
+      <div style="font-size:12px;color:var(--text-dim);">Max reached · <a href="select_plan.php?upgrade=1" style="color:#818CF8;text-decoration:none;font-weight:600;">Upgrade</a></div>
+      <?php endif; ?>
+    </div>
+
+    <?php if(empty($user_sites)): ?>
+    <div class="settings-card" style="padding:48px;text-align:center;">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--accent-glow);border:1px solid var(--accent-border);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path stroke="#818CF8" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3"/></svg>
+      </div>
+      <p style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">No sites yet</p>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:18px;">Add your first site to get started.</p>
+      <button onclick="openAddSiteModal()" class="btn btn-primary">Add Your First Site</button>
+    </div>
+
+    <?php else: ?>
+    <?php foreach($user_sites as $i => $s):
+      $s_settings = $all_site_settings[$s['site_id']] ?? [];
+      $s_chatbot_name = $s_settings['chatbot_name'] ?? 'Bitchat Assistant';
+      $s_color = $s_settings['primary_color'] ?? '#6C3CE1';
+    ?>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:10px;overflow:hidden;">
+
+      <!-- Accordion Header -->
+      <div onclick="toggleSiteAcc('siteacc-<?php echo $i;?>',this)"
+        style="display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;transition:background .15s;"
+        onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+
+        <!-- Status dot -->
+        <div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:<?php echo $s['has_data']?'var(--green)':'var(--amber)';?>;<?php echo $s['has_data']?'box-shadow:0 0 6px var(--green)':''; ?>;"></div>
+
+        <!-- Name + ID -->
+        <div style="flex:1;min-width:0;">
+          <p style="font-size:14px;font-weight:700;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?php echo htmlspecialchars($s['site_name']); ?></p>
+          <p style="font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;margin-top:2px;"><?php echo htmlspecialchars($s['site_id']); ?></p>
+        </div>
+
+        <!-- Badges -->
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <span class="tag <?php echo $s['has_data']?'tag-success':'tag-warn'; ?>"><?php echo $s['has_data']?'Active':'No Data'; ?></span>
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--surface2);color:var(--text-muted);border:1px solid var(--border);font-family:'DM Mono',monospace;">#<?php echo $i+1; ?></span>
+        </div>
+
+        <!-- Chevron -->
+        <svg id="chev-siteacc-<?php echo $i;?>" style="flex-shrink:0;transition:transform .2s;color:var(--text-dim);" width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
       </div>
 
-    </div>
-  </section>
+      <!-- Accordion Body -->
+      <div id="siteacc-<?php echo $i;?>" style="display:none;border-top:1px solid var(--border);padding:20px;">
 
+        <!-- Meta grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px 24px;margin-bottom:20px;">
+
+          <div>
+            <p style="font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Site Name</p>
+            <p style="font-size:13.5px;font-weight:600;color:var(--text);"><?php echo htmlspecialchars($s['site_name']); ?></p>
+          </div>
+
+          <div>
+            <p style="font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Domain Restriction</p>
+            <?php if($s['website_url']): ?>
+            <p style="font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px;">
+              <span style="font-size:11px;background:rgba(56,189,248,0.08);color:#38BDF8;border:1px solid rgba(56,189,248,0.15);padding:2px 8px;border-radius:20px;">Locked</span>
+              <?php echo htmlspecialchars($s['website_url']); ?>
+            </p>
+            <?php else: ?>
+            <p style="font-size:13px;color:var(--text-muted);font-style:italic;">None (works anywhere)</p>
+            <?php endif; ?>
+          </div>
+
+          <div>
+            <p style="font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Data Status</p>
+            <p style="font-size:13px;font-weight:600;color:<?php echo $s['has_data']?'var(--green)':'var(--amber)'; ?>;">
+              <?php echo $s['has_data']?'✅ Knowledge base loaded':'⏳ No data uploaded'; ?>
+            </p>
+          </div>
+
+          <div>
+            <p style="font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Q&amp;A Count</p>
+            <p style="font-size:13.5px;font-weight:600;color:var(--text);"><?php echo $s['qa_count'] > 0 ? number_format($s['qa_count']).' pairs' : '—'; ?></p>
+          </div>
+
+          <?php if($plan_has_cust): ?>
+          <div>
+            <p style="font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Chatbot Name</p>
+            <p style="font-size:13.5px;font-weight:600;color:var(--text);"><?php echo htmlspecialchars($s_chatbot_name); ?></p>
+          </div>
+          <div>
+            <p style="font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Brand Color</p>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:18px;height:18px;border-radius:5px;background:<?php echo htmlspecialchars($s_color); ?>;border:1px solid rgba(255,255,255,0.1);"></div>
+              <span style="font-size:12px;font-family:'DM Mono',monospace;color:var(--text);"><?php echo htmlspecialchars($s_color); ?></span>
+            </div>
+          </div>
+          <?php endif; ?>
+
+        </div>
+
+        <!-- Divider -->
+        <div style="border-top:1px solid var(--border-soft);margin-bottom:16px;"></div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button onclick="openEditSiteModal('<?php echo htmlspecialchars(addslashes($s['site_id'])); ?>','<?php echo htmlspecialchars(addslashes($s['site_name'])); ?>','<?php echo htmlspecialchars(addslashes($s['website_url']??'')); ?>')"
+            class="btn btn-secondary" style="font-size:12px;padding:8px 14px;gap:6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Edit Site
+          </button>
+
+          <button onclick="window.location.href='?site=<?php echo urlencode($s['site_id']); ?>';setTimeout(()=>showSection('upload'),400);"
+            class="btn btn-secondary" style="font-size:12px;padding:8px 14px;gap:6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            Upload Data
+          </button>
+
+          <?php if($plan_has_cust): ?>
+          <a href="chatbot_customize.php?site=<?php echo urlencode($s['site_id']); ?>"
+            class="btn btn-secondary" style="font-size:12px;padding:8px 14px;gap:6px;text-decoration:none;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            Customize
+          </a>
+          <?php endif; ?>
+
+          <button onclick="window.location.href='?site=<?php echo urlencode($s['site_id']); ?>';setTimeout(()=>showSection('embed'),400);"
+            class="btn btn-secondary" style="font-size:12px;padding:8px 14px;gap:6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+            Embed Code
+          </button>
+
+          <?php if(count($user_sites) > 1): ?>
+          <button onclick="deleteSite('<?php echo htmlspecialchars(addslashes($s['site_id'])); ?>')"
+            class="btn btn-danger" style="font-size:12px;padding:8px 14px;gap:6px;margin-left:auto;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Delete Site
+          </button>
+          <?php endif; ?>
+        </div>
+
+      </div>
+    </div>
+    <?php endforeach; ?>
+    <?php endif; ?>
+
+  </div><!-- /spanel-sites -->
+
+</section>
   </main>
 
   <!-- ── ADD SITE MODAL ── -->
@@ -1117,7 +1249,37 @@
           }
       } catch(e) { msg.innerHTML = '<div style="color:var(--red);font-size:13px;margin-bottom:10px;">Network error.</div>'; btn.disabled = false; btn.textContent = 'Create Site'; }
   }
+function switchSettingsTab(name, btn) {
+    ['general','sites'].forEach(t => {
+        const panel = document.getElementById('spanel-' + t);
+        const tab   = document.getElementById('stab-' + t);
+        if (panel) panel.style.display = 'none';
+        if (tab) {
+            tab.style.background  = 'transparent';
+            tab.style.color       = 'var(--text-muted)';
+            tab.style.border      = 'none';
+            tab.style.fontWeight  = '400';
+        }
+    });
+    const activePanel = document.getElementById('spanel-' + name);
+    if (activePanel) {
+        activePanel.style.display = name === 'sites' ? 'flex' : 'flex';
+        activePanel.style.flexDirection = 'column';
+    }
+    btn.style.background = 'var(--surface)';
+    btn.style.color      = 'var(--text)';
+    btn.style.border     = '1px solid var(--border)';
+    btn.style.fontWeight = '600';
+}
 
+function toggleSiteAcc(bodyId, header) {
+    const body   = document.getElementById(bodyId);
+    const chevId = 'chev-' + bodyId;
+    const chev   = document.getElementById(chevId);
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    if (chev) chev.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
   async function updateSite() {
       const site_id   = document.getElementById('editSiteId').value;
       const site_name = document.getElementById('editSiteName').value.trim();
