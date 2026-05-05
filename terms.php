@@ -347,20 +347,6 @@ body::before {
   <div class="page-hero-glow"></div>
   <div class="page-badge">Legal Document</div>
   <h1 class="page-h1">Terms &amp; Conditions</h1>
-  <div class="page-meta">
-    <span>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="#4A4C66" stroke-width="1.8"/><path d="M16 2v4M8 2v4M3 10h18" stroke="#4A4C66" stroke-width="1.8" stroke-linecap="round"/></svg>
-      Effective: January 1, 2026
-    </span>
-    <span>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#4A4C66" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="#4A4C66" stroke-width="1.8" stroke-linecap="round"/></svg>
-      Last Updated: May 2026
-    </span>
-    <span>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#4A4C66" stroke-width="1.8"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="#4A4C66" stroke-width="1.8" stroke-linecap="round"/></svg>
-      ~10 min read
-    </span>
-  </div>
 </section>
 
 <!-- ══ CONTENT ══ -->
