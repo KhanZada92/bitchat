@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bitchat</title>
+<title>bitchatbot</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -298,7 +298,7 @@ body {
           <circle cx="15" cy="13" r="1.5" fill="rgba(255,255,255,0.85)"/>
         </svg>
       </div>
-      <div class="bc-header-name">Bitchat Assistant</div>
+      <div class="bc-header-name">Bitchatbot</div>
     </div>
     <div style="display:flex;align-items:center;gap:4px;">
   
@@ -436,9 +436,13 @@ async function bcLoadSettings(siteId) {
       'https://bitchatbot.io/get_chatbot_settings.php?site=' + encodeURIComponent(siteId)
     );
     const s = await res.json();
+const name     = (s.chatbot_name  && s.chatbot_name.trim())  ? s.chatbot_name  : 'Bitchatbot';
+const color    = (s.primary_color && s.primary_color.trim()) ? s.primary_color : '#6C3CE1';
+const greeting = (s.greeting_msg  && s.greeting_msg.trim())  ? s.greeting_msg  : 'Hi! How can I assist you today?';
 
-    const name  = (s.chatbot_name  && s.chatbot_name.trim())  ? s.chatbot_name  : 'Bitchatbot Assistant';
-    const color = (s.primary_color && s.primary_color.trim()) ? s.primary_color : '#6C3CE1';
+// Greeting update
+const firstBubble = document.querySelector('.bc-bubble');
+if (firstBubble) firstBubble.textContent = greeting;
 
     // Header name update
     document.querySelector('.bc-header-name').textContent = name;

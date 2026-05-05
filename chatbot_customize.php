@@ -10,12 +10,29 @@ $stmt->bind_param("i", $_SESSION['user_id']); $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
 if ($row) foreach ($row as $k => $v) $_SESSION[$k] = $v;
 
-if ($_SESSION['role'] === 'admin') { header('Location: admin.php'); exit(); }
-if ($_SESSION['status'] !== 'approved') { header('Location: dashboard.php'); exit(); }
+// ── Admin check ──
+$is_admin = ($_SESSION['role'] === 'admin');
 
-$plan    = $_SESSION['plan'] ?? 'basic';
+// Admin without site param → redirect to admin panel (not dashboard)
+if ($is_admin && empty($_GET['site'])) {
+    header('Location: admin.php'); exit();
+}
+
+// Non-admin: status check
+if (!$is_admin && $_SESSION['status'] !== 'approved') {
+    header('Location: dashboard.php'); exit();
+}
+
+$plan    = $is_admin ? 'pro' : ($_SESSION['plan'] ?? 'basic'); // Admin gets pro-level access
 $user_id = $_SESSION['user_id'];
-$allowed = in_array($plan, ['starter', 'pro']);
+
+// Admin can customize any plan — users need starter/pro
+$allowed = $is_admin || in_array($plan, ['starter', 'pro']);
+
+// ── Back link ──
+$dashboard_back = $is_admin
+    ? 'dashboard.php?user_mode=1'
+    : 'dashboard.php';
 
 // ── Load all user's sites ──
 $all_sites = [];
@@ -56,7 +73,10 @@ foreach ($all_sites as $s) {
     if ($s['site_id'] === $site_id) { $site_name = $s['site_name']; break; }
 }
 
-$dashboard_back = 'dashboard.php?site=' . urlencode($site_id);
+// Update back link with site
+$dashboard_back = $is_admin
+    ? 'dashboard.php?user_mode=1&site=' . urlencode($site_id)
+    : 'dashboard.php?site=' . urlencode($site_id);
 
 // ── Default settings ──
 $settings = [
@@ -108,7 +128,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allowed) {
         $upd->close();
 
         if ($affected === 0) {
-            // No existing row — INSERT new one
             $ins = $conn->prepare("INSERT INTO chatbot_settings (user_id, site_id, chatbot_name, primary_color, greeting_msg) VALUES (?,?,?,?,?)");
             $ins->bind_param("issss", $user_id, $post_site_id, $name, $color, $greeting);
             $ins->execute();
@@ -127,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $allowed) {
         $msg = ['type'=>'success','text'=>'✅ Saved for ' . htmlspecialchars($site_name) . '!'];
 
         if (!empty($_POST['redirect_back'])) {
-            header('Location: dashboard.php?site=' . urlencode($post_site_id));
+            header('Location: ' . $dashboard_back);
             exit();
         }
     }
@@ -161,8 +180,9 @@ body { background:var(--bg); color:var(--text); min-height:100vh; }
 .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; }
 .tag { display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700; }
 .plan-starter { background:rgba(99,102,241,0.15);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3); }
-.plan-pro { background:rgba(6,182,212,0.15);color:#67E8F9;border:1px solid rgba(6,182,212,0.3); }
-.plan-basic { background:rgba(107,114,128,0.15);color:#9CA3AF;border:1px solid rgba(107,114,128,0.25); }
+.plan-pro     { background:rgba(6,182,212,0.15);color:#67E8F9;border:1px solid rgba(6,182,212,0.3); }
+.plan-basic   { background:rgba(107,114,128,0.15);color:#9CA3AF;border:1px solid rgba(107,114,128,0.25); }
+.plan-admin   { background:rgba(245,158,11,0.15);color:#FCD34D;border:1px solid rgba(245,158,11,0.3); }
 
 .site-tab-btn {
   padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600;
@@ -190,6 +210,9 @@ body { background:var(--bg); color:var(--text); min-height:100vh; }
 .swatch { width:34px;height:34px;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:all 0.15s; }
 .swatch:hover,.swatch.selected { transform:scale(1.12);border-color:white;box-shadow:0 0 0 3px rgba(255,255,255,0.12); }
 .locked-overlay { position:absolute;inset:0;background:rgba(10,10,15,0.9);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:16px;z-index:10;gap:14px; }
+
+/* Admin badge */
+.admin-badge { display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:700;background:rgba(245,158,11,0.12);color:#FCD34D;border:1px solid rgba(245,158,11,0.25); }
 </style>
 </head>
 <body>
@@ -202,7 +225,17 @@ body { background:var(--bg); color:var(--text); min-height:100vh; }
     </div>
     <span style="font-weight:700;font-size:15px;color:white;">Bitchat</span>
   </a>
+
+  <?php if($is_admin): ?>
+  <span class="admin-badge">
+    <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    Admin Mode
+  </span>
+  <a href="admin.php" style="font-size:12px;color:#F59E0B;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:600;">← Admin Panel</a>
+  <?php else: ?>
   <span class="tag plan-<?php echo $plan; ?>"><?php echo strtoupper($plan); ?></span>
+  <?php endif; ?>
+
   <a href="<?php echo htmlspecialchars($dashboard_back); ?>" style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.2);color:#A78BFA;padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:600;text-decoration:none;">← <?php echo htmlspecialchars($site_name); ?></a>
 </nav>
 
@@ -210,7 +243,13 @@ body { background:var(--bg); color:var(--text); min-height:100vh; }
 
   <div style="margin-bottom:20px;">
     <h1 style="font-size:24px;font-weight:800;color:white;margin-bottom:4px;">🎨 Customize Chatbot</h1>
-    <p style="color:var(--muted);font-size:13px;">Each site has its own name, color and greeting — fully independent.</p>
+    <p style="color:var(--muted);font-size:13px;">
+      <?php if($is_admin): ?>
+      Admin access — full customization for all sites.
+      <?php else: ?>
+      Each site has its own name, color and greeting — fully independent.
+      <?php endif; ?>
+    </p>
   </div>
 
   <!-- SITE SELECTOR TABS -->
@@ -231,12 +270,15 @@ body { background:var(--bg); color:var(--text); min-height:100vh; }
   <?php endif; ?>
 
   <!-- Currently editing -->
-  <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.18);border-radius:10px;padding:10px 16px;margin-bottom:22px;display:flex;align-items:center;gap:10px;">
+  <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.18);border-radius:10px;padding:10px 16px;margin-bottom:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <div style="width:8px;height:8px;border-radius:50%;background:#A78BFA;flex-shrink:0;"></div>
     <p style="font-size:13px;color:#A78BFA;font-weight:600;">
       Editing: <strong style="color:white;"><?php echo htmlspecialchars($site_name); ?></strong>
       <code style="font-size:10.5px;color:var(--muted);margin-left:8px;font-family:monospace;"><?php echo htmlspecialchars($site_id); ?></code>
     </p>
+    <?php if($is_admin): ?>
+    <span style="margin-left:auto;font-size:11px;color:#F59E0B;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);padding:3px 10px;border-radius:20px;font-weight:700;">🔓 Admin — No restrictions</span>
+    <?php endif; ?>
   </div>
 
   <?php if ($msg): ?>
@@ -244,6 +286,15 @@ body { background:var(--bg); color:var(--text); min-height:100vh; }
     <?php echo $msg['text']; ?>
   </div>
   <?php endif; ?>
+
+  <!-- No sites warning -->
+  <?php if(empty($all_sites)): ?>
+  <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:14px;padding:32px;text-align:center;">
+    <p style="font-size:16px;font-weight:700;color:#FBBF24;margin-bottom:8px;">⚠️ No sites found</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:18px;">You need to add a site first before you can customize a chatbot.</p>
+    <a href="<?php echo $is_admin ? 'dashboard.php?user_mode=1' : 'dashboard.php'; ?>" style="background:#7C3AED;color:white;padding:10px 24px;border-radius:10px;font-weight:700;font-size:13.5px;text-decoration:none;">Go to Dashboard</a>
+  </div>
+  <?php else: ?>
 
   <div style="display:grid;grid-template-columns:1fr 330px;gap:28px;align-items:start;">
 
@@ -293,7 +344,7 @@ body { background:var(--bg); color:var(--text); min-height:100vh; }
             <?php endforeach; ?>
           </div>
           <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Custom Color</p>
-          <div style="display:flex;align-items:center;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <input type="color" id="colorPicker" value="<?php echo $settings['primary_color']; ?>"
               style="width:52px;height:44px;border:none;background:none;cursor:pointer;border-radius:8px;padding:2px;"
               oninput="pickColor(this.value)">
@@ -306,15 +357,24 @@ body { background:var(--bg); color:var(--text); min-height:100vh; }
         </div>
 
         <!-- Buttons -->
-        <div style="display:flex;gap:10px;">
-          <button type="submit" style="flex:1;background:var(--accent);color:white;border:none;padding:14px 24px;border-radius:11px;font-weight:700;font-size:14px;cursor:pointer;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="submit" style="flex:1;min-width:160px;background:var(--accent);color:white;border:none;padding:14px 24px;border-radius:11px;font-weight:700;font-size:14px;cursor:pointer;transition:background 0.18s;"
+            onmouseover="this.style.background='#8B5CF6'" onmouseout="this.style.background='var(--accent)'">
             💾 Save for <?php echo htmlspecialchars($site_name); ?>
           </button>
           <button type="submit" name="redirect_back" value="1"
-            style="background:rgba(124,58,237,0.15);color:#A78BFA;border:1px solid rgba(124,58,237,0.3);padding:14px 18px;border-radius:11px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">
+            style="background:rgba(124,58,237,0.15);color:#A78BFA;border:1px solid rgba(124,58,237,0.3);padding:14px 18px;border-radius:11px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;transition:all 0.18s;"
+            onmouseover="this.style.background='rgba(124,58,237,0.25)'" onmouseout="this.style.background='rgba(124,58,237,0.15)'">
             Save &amp; Back →
           </button>
         </div>
+
+        <?php if($is_admin): ?>
+        <div style="background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.15);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+          <svg width="14" height="14" fill="none" stroke="#F59E0B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <p style="font-size:12px;color:#F59E0B;">Admin: Changes here only affect <strong><?php echo htmlspecialchars($site_name); ?></strong>'s chatbot appearance on the main website.</p>
+        </div>
+        <?php endif; ?>
       </form>
     </div>
 
@@ -369,14 +429,23 @@ body { background:var(--bg); color:var(--text); min-height:100vh; }
             </div>
           </div>
           <div style="display:flex;justify-content:space-between;">
-            <span style="color:var(--muted);">Plan</span>
+            <span style="color:var(--muted);">Access</span>
+            <?php if($is_admin): ?>
+            <span class="tag plan-admin">ADMIN</span>
+            <?php else: ?>
             <span class="tag plan-<?php echo $plan; ?>"><?php echo strtoupper($plan); ?></span>
+            <?php endif; ?>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--muted);">Site</span>
+            <code style="color:var(--muted);font-size:11px;"><?php echo htmlspecialchars(substr($site_id,0,20)); ?>...</code>
           </div>
         </div>
       </div>
     </div>
 
   </div>
+  <?php endif; ?>
 </div>
 
 <script>
@@ -396,7 +465,10 @@ function pickColor(hex) {
     applyColor(hex);
 }
 function onHexInput(val) {
-    if (/^#[0-9A-Fa-f]{6}$/.test(val)) { document.getElementById('colorPicker').value = val; applyColor(val); }
+    if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+        document.getElementById('colorPicker').value = val;
+        applyColor(val);
+    }
 }
 function applyColor(hex) {
     document.getElementById('prev-toggle').style.background      = hex;
@@ -407,7 +479,9 @@ function applyColor(hex) {
     document.getElementById('colorPreviewDot').style.background  = hex;
     document.getElementById('cfg-color-dot').style.background    = hex;
     document.getElementById('cfg-color-text').textContent        = hex.toUpperCase();
-    document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('selected', s.title.toUpperCase() === hex.toUpperCase()));
+    document.querySelectorAll('.swatch').forEach(s => {
+        s.classList.toggle('selected', s.title.toUpperCase() === hex.toUpperCase());
+    });
 }
 </script>
 </body>

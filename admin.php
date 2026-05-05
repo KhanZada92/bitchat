@@ -17,7 +17,7 @@ if (isset($_SESSION['user_id'])) {
     if ($row) { $_SESSION['role'] = $row['role']; $_SESSION['status'] = $row['status']; }
 }
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-    header('Location: login.php'); exit();
+header('Location: admin_login.php'); exit();
 }
 
 // ============ POST ACTIONS ============
