@@ -24,10 +24,8 @@ function sendEmail($to, $subject, $message, $headers = '') {
     } else {
         // Fallback to PHP mail() if PHPMailer not available
         if (empty($headers)) {
-            $from_email = getenv('SMTP_FROM_EMAIL') ?: 'noreply@bitchatbot.io';
-            $from_name = getenv('SMTP_FROM_NAME') ?: 'Bitchatbot';
-            $headers = "From: {$from_name} <{$from_email}>\r\n";
-            $headers .= "Reply-To: {$from_email}\r\n";
+         $headers = "From: Bitchatbot <support@bitchatbot.io>\r\n";
+            $headers .= "Reply-To: support@bitchatbot.io\r\n";
             $headers .= "MIME-Version: 1.0\r\n";
             $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
         }
@@ -36,56 +34,40 @@ function sendEmail($to, $subject, $message, $headers = '') {
     }
 }
 
-/**
- * Send email via SMTP using PHPMailer
- */
 function sendEmailViaSMTP($to, $subject, $message) {
     $mail = null;
     try {
         $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
-        
-        // SMTP Configuration
-        $mail->isSMTP();
-        $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.yourdomain.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = getenv('SMTP_USERNAME') ?: 'noreply@bitchatbot.io';
-        $mail->Password   = getenv('SMTP_PASSWORD') ?: '';
-        $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = (int)(getenv('SMTP_PORT') ?: 587);
 
-        // Optional debugging (set SMTP_DEBUG=2 in env to enable)
-        $debug = (int)(getenv('SMTP_DEBUG') ?: 0);
-        if ($debug > 0) {
-            $mail->SMTPDebug = $debug;
-            $mail->Debugoutput = function ($str, $level) {
-                error_log("SMTP[{$level}]: " . $str);
-            };
-        }
-        
+        // ── Hostinger SMTP Configuration ──
+        $mail->isSMTP();
+        $mail->Host       = 'smtp.hostinger.com';
+        $mail->SMTPAuth   = true;
+        $mail->Username   = 'support@bitchatbot.io';
+        $mail->Password   = getenv('SMTP_PASSWORD') ?: '';
+        $mail->SMTPSecure = 'ssl';
+        $mail->Port       = 465;
+
         // Sender
-        $from_email = getenv('SMTP_FROM_EMAIL') ?: 'noreply@bitchatbot.io';
-        $from_name = getenv('SMTP_FROM_NAME') ?: 'Bitchatbot';
-        $mail->setFrom($from_email, $from_name);
-        
+        $mail->setFrom('support@bitchatbot.io', 'Bitchatbot');
+
         // Recipient
         $mail->addAddress($to);
-        
+
         // Content
         $mail->isHTML(true);
         $mail->Subject = $subject;
         $mail->Body    = $message;
-        
-        // Send
+
         $mail->send();
         return true;
-        
+
     } catch (\Exception $e) {
         $err = $mail ? $mail->ErrorInfo : '';
         error_log("Email sending failed: " . $e->getMessage() . ($err ? " | " . $err : ""));
         return false;
     }
 }
-
 /**
  * Send login notification (once per day max)
  */
@@ -398,5 +380,34 @@ function sendPaymentConfirmationEmail($conn, $user, $plan, $amount, $expiry_date
         logEmail($conn, $user['id'], $email_type, 'failed');
     }
     
+    return $sent;
+}
+
+/**
+ * Send OTP verification email
+ */
+function sendOTPEmail($conn, $user, $otp) {
+    $subject = "Your Bitchatbot Verification Code: {$otp}";
+    $message = "
+    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+        <h2 style='color: #4F46E5;'>Verify Your Email Address</h2>
+        <p>Hi <strong>{$user['username']}</strong>,</p>
+        <p>Use the OTP below to verify your email address. This code expires in <strong>10 minutes</strong>.</p>
+        <div style='background:#F3F4F6;padding:30px;border-radius:12px;margin:24px 0;text-align:center;'>
+            <p style='margin:0 0 8px 0;color:#6B7280;font-size:14px;'>Your verification code</p>
+            <h1 style='margin:0;font-size:48px;font-weight:800;letter-spacing:12px;color:#4F46E5;'>{$otp}</h1>
+        </div>
+        <p style='color:#6B7280;font-size:14px;'>If you did not register on Bitchatbot, please ignore this email.</p>
+        <hr style='border:none;border-top:1px solid #E5E7EB;margin:20px 0;'>
+        <p style='color:#9CA3AF;font-size:12px;'>Bitchatbot - AI Chatbot Platform<br>
+        <a href='https://bitchatbot.io' style='color:#4F46E5;text-decoration:none;'>https://bitchatbot.io</a></p>
+    </div>
+    ";
+    $sent = sendEmail($user['email'], $subject, $message);
+    if ($sent) {
+        logEmail($conn, $user['id'], 'otp_verification', 'sent');
+    } else {
+        logEmail($conn, $user['id'], 'otp_verification', 'failed');
+    }
     return $sent;
 }

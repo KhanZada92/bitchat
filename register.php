@@ -71,20 +71,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['plan']      = null;
             $_SESSION['logged_in'] = true;
 
-            // Send welcome email
-            $welcome_user = [
+            // OTP generate karein
+            $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $otp_expires = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+
+            // OTP database mein save karein
+            $otp_stmt = $conn->prepare("UPDATE users SET otp = ?, otp_expires_at = ?, is_verified = 0 WHERE id = ?");
+            $otp_stmt->bind_param("ssi", $otp, $otp_expires, $new_id);
+            $otp_stmt->execute();
+            $otp_stmt->close();
+
+            // OTP email bhejein
+            $otp_user = [
                 'id' => $new_id,
                 'username' => $username,
                 'email' => $email,
-                'email_consent' => $email_consent
+                'email_consent' => 1
             ];
-            sendWelcomeEmail($conn, $welcome_user);
+            sendOTPEmail($conn, $otp_user, $otp);
 
-            // ── Plan ke saath redirect ──
-            $redirect = !empty($selected_plan)
-                ? 'select_plan.php?plan=' . $selected_plan
-                : 'select_plan.php';
+            // Session mein save karein
+            $_SESSION['pending_user_id'] = $new_id;
+            $_SESSION['pending_plan'] = $selected_plan;
 
+            unset($_SESSION['selected_plan']);
+            header('Location: verify_otp.php'); exit();
             unset($_SESSION['selected_plan']); // clean up
             header('Location: ' . $redirect); exit();
         } else {
