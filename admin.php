@@ -219,6 +219,10 @@ $coupons_res = $conn->query("SELECT * FROM coupons ORDER BY created_at DESC");
 $coupons = $coupons_res ? $coupons_res->fetch_all(MYSQLI_ASSOC) : [];
 
 $plan_limits = ['basic'=>1,'starter'=>5,'pro'=>10];
+
+// ── Support unread count (only query needed here) ──
+$adm_unread_res = $conn->query("SELECT COUNT(*) as cnt FROM support_chats WHERE sender='user' AND is_read=0");
+$adm_sup_unread = $adm_unread_res ? (int)$adm_unread_res->fetch_assoc()['cnt'] : 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -333,6 +337,14 @@ tr.client-row:hover td { background:rgba(255,255,255,0.02); }
         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
         Coupons <span style="margin-left:auto;background:rgba(245,158,11,0.2);color:#FCD34D;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700;"><?php echo count($coupons); ?></span>
     </a>
+    <button type="button" onclick="toggleAdminSupportWidget()" class="nav-item" id="nav-support" style="width:100%;text-align:left;position:relative;border:none;background:transparent;">
+        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+        Support
+        <span id="adm-nav-unread" style="margin-left:auto;background:rgba(239,68,68,0.2);color:#F87171;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700;<?php echo $adm_sup_unread > 0 ? '' : 'display:none;'; ?>"><?php echo $adm_sup_unread; ?></span>
+    </button>
 </aside>
 
 <!-- MAIN -->
@@ -658,6 +670,270 @@ if($active_tab==='coupons'): ?>
     </div>
 </div>
 <?php endif; ?>
+
+<section id="admin-support-widget" style="display:none;position:fixed;right:24px;bottom:24px;width:min(95vw,980px);height:min(82vh,680px);z-index:10070;">
+<div class="card" style="display:flex;flex-direction:column;height:100%;box-shadow:0 22px 60px rgba(0,0,0,0.5);">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0;padding:12px 16px;border-bottom:1px solid var(--border);">
+    <h1 style="font-size:20px;font-weight:800;color:white;">💬 Support Chat</h1>
+    <div style="font-size:12.5px;color:var(--muted);">
+        <span id="adm-widget-unread"><?php echo $adm_sup_unread; ?></span> unread message<span id="adm-widget-unread-s"><?php echo $adm_sup_unread!==1?'s':''; ?></span> from users
+    </div>
+    <button type="button" onclick="closeAdminSupportWidget()" style="border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:16px;line-height:1;">&times;</button>
+</div>
+
+<div style="display:grid;grid-template-columns:280px 1fr;gap:16px;flex:1;min-height:0;padding:16px;">
+
+    <!-- Users list -->
+    <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+            <p style="font-size:12.5px;font-weight:700;color:white;">Users</p>
+            <input type="text" placeholder="Search user..." oninput="supAdmSearch(this.value)"
+                style="width:100%;margin-top:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 11px;color:white;font-size:12px;outline:none;">
+        </div>
+        <div style="flex:1;overflow-y:auto;" id="adm-user-list">
+            <div style="padding:36px;text-align:center;color:var(--muted);font-size:13px;">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Chat panel -->
+    <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
+
+        <!-- Empty state -->
+        <div id="adm-sup-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:32px;text-align:center;">
+            <div style="width:56px;height:56px;border-radius:16px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.2);display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path stroke="#A78BFA" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            </div>
+            <p style="font-size:14px;font-weight:600;color:white;margin-bottom:6px;">Select a user</p>
+            <p style="font-size:12.5px;color:var(--muted);">Click a user on the left to view their messages and reply</p>
+        </div>
+
+        <!-- Active conversation -->
+        <div id="adm-sup-convo" style="display:none;flex-direction:column;height:100%;overflow:hidden;">
+
+            <!-- Header -->
+            <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;">
+                <div id="adm-user-avatar" style="width:38px;height:38px;border-radius:10px;background:rgba(124,58,237,0.2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#A78BFA;flex-shrink:0;"></div>
+                <div style="flex:1;min-width:0;">
+                    <p id="adm-user-name" style="font-size:13.5px;font-weight:700;color:white;"></p>
+                    <p id="adm-user-email" style="font-size:11.5px;color:var(--muted);margin-top:1px;"></p>
+                </div>
+                <div id="adm-user-plan" style="font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(124,58,237,0.12);color:#A78BFA;flex-shrink:0;"></div>
+            </div>
+
+            <!-- Messages -->
+            <div id="adm-messages" style="flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;min-height:0;"></div>
+
+            <!-- Reply input -->
+            <div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0;align-items:flex-end;">
+                <textarea id="adm-reply-input" rows="1"
+                    placeholder="Type reply... (Enter to send, Shift+Enter for new line)"
+                    style="flex:1;resize:none;background:var(--surface2);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:10px 14px;color:white;font-size:13px;outline:none;font-family:'Plus Jakarta Sans',sans-serif;min-height:42px;max-height:110px;overflow-y:auto;transition:border-color 0.18s;"
+                    onfocus="this.style.borderColor='#7C3AED'"
+                    onblur="this.style.borderColor='rgba(255,255,255,0.07)'"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();admSendReply();}"
+                    oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';">
+                </textarea>
+                <button onclick="admSendReply()" id="adm-send-btn"
+                    style="width:42px;height:42px;border-radius:10px;background:#7C3AED;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.18s;"
+                    onmouseover="this.style.background='#8B5CF6'"
+                    onmouseout="this.style.background='#7C3AED'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ══════ SUPPORT CHAT — ADMIN ══════
+let admCurrentUid  = null;
+let admCurrentUser = null;
+let admPoll        = null;
+let admWidgetOpen  = false;
+
+function openAdminSupportWidget() {
+    admWidgetOpen = true;
+    document.getElementById('admin-support-widget').style.display = 'block';
+    document.getElementById('adm-sup-fab').style.display = 'none';
+    admLoadUsers();
+}
+
+function closeAdminSupportWidget() {
+    admWidgetOpen = false;
+    document.getElementById('admin-support-widget').style.display = 'none';
+    document.getElementById('adm-sup-fab').style.display = 'flex';
+    clearInterval(admPoll);
+}
+
+function toggleAdminSupportWidget() {
+    if (admWidgetOpen) closeAdminSupportWidget();
+    else openAdminSupportWidget();
+}
+
+async function admLoadUsers() {
+    const res  = await fetch('support_chat.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_get_users'})});
+    const data = await res.json();
+    const list = document.getElementById('adm-user-list');
+    if (!data.success || !data.users.length) {
+        list.innerHTML = '<div style="padding:48px 20px;text-align:center;color:var(--muted);font-size:13px;">No messages from users yet.</div>';
+        return;
+    }
+    list.innerHTML = data.users.map(u => {
+        const timeStr = u.last_msg ? new Date(u.last_msg).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        const preview = u.last_text ? u.last_text.substring(0,38) + (u.last_text.length > 38 ? '…' : '') : '';
+        const hasUnread = u.unread > 0;
+        return `<div onclick="admOpenChatFromEl(this)"
+                     class="site-item" data-uid="${u.id}" data-username="${escHtml(u.username)}" data-email="${escHtml(u.email)}" data-plan="${escHtml((u.plan||'basic'))}" data-search="${escHtml((u.username.toLowerCase() + ' ' + u.email.toLowerCase()))}"
+                     style="border-bottom:1px solid var(--border);padding:12px 16px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:9px;background:${hasUnread?'rgba(239,68,68,0.15)':'rgba(124,58,237,0.12)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:${hasUnread?'#F87171':'#A78BFA'};flex-shrink:0;position:relative;">
+                    ${u.username.charAt(0).toUpperCase()}
+                    ${hasUnread ? `<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:#EF4444;box-shadow:0 0 5px #EF4444;border:2px solid var(--surface);"></span>` : ''}
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                        <p style="font-size:13px;font-weight:${hasUnread?'700':'600'};color:${hasUnread?'white':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(u.username)}</p>
+                        <span style="font-size:10px;color:var(--muted);white-space:nowrap;font-family:monospace;">${timeStr}</span>
+                    </div>
+                    <p style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escHtml(preview)}</p>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function admCheckUnread() {
+    const res  = await fetch('support_chat.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_unread'})});
+    const data = await res.json();
+    if (!data.success) return;
+    const count = Number(data.count || 0);
+    const navBadge = document.getElementById('adm-nav-unread');
+    const fabDot = document.getElementById('adm-sup-fab-dot');
+    const widgetCount = document.getElementById('adm-widget-unread');
+    const widgetPlural = document.getElementById('adm-widget-unread-s');
+    if (navBadge) {
+        navBadge.textContent = String(count);
+        navBadge.style.display = count > 0 ? '' : 'none';
+    }
+    if (fabDot) {
+        fabDot.style.display = (count > 0 && !admWidgetOpen) ? 'block' : 'none';
+    }
+    if (widgetCount) widgetCount.textContent = String(count);
+    if (widgetPlural) widgetPlural.textContent = count === 1 ? '' : 's';
+}
+
+function supAdmSearch(val) {
+    val = val.toLowerCase().trim();
+    document.querySelectorAll('#adm-user-list .site-item').forEach(el => {
+        el.style.display = (!val || (el.dataset.search||'').includes(val)) ? '' : 'none';
+    });
+}
+
+async function admOpenChat(uid, username, email, plan) {
+    admCurrentUid  = uid;
+    admCurrentUser = {username, email, plan};
+    document.querySelectorAll('#adm-user-list .site-item').forEach(el => el.classList.remove('active'));
+    const el = document.querySelector(`[data-uid="${uid}"]`);
+    if (el) el.classList.add('active');
+
+    document.getElementById('adm-sup-empty').style.display   = 'none';
+    document.getElementById('adm-sup-convo').style.display   = 'flex';
+    document.getElementById('adm-user-avatar').textContent   = username.charAt(0).toUpperCase();
+    document.getElementById('adm-user-name').textContent     = username;
+    document.getElementById('adm-user-email').textContent    = email;
+    document.getElementById('adm-user-plan').textContent     = plan.toUpperCase();
+
+    await admFetchMessages(true);
+
+    clearInterval(admPoll);
+    admPoll = setInterval(() => admFetchMessages(false), 8000);
+}
+
+function admOpenChatFromEl(el) {
+    if (!el || !el.dataset) return;
+    admOpenChat(
+        Number(el.dataset.uid || 0),
+        el.dataset.username || '',
+        el.dataset.email || '',
+        el.dataset.plan || 'basic'
+    );
+}
+
+async function admFetchMessages(scroll) {
+    const res  = await fetch('support_chat.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_get_messages',user_id:admCurrentUid})});
+    const data = await res.json();
+    if (!data.success) return;
+
+    const box  = document.getElementById('adm-messages');
+    const msgs = data.messages || [];
+
+    if (!msgs.length) {
+        box.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;margin-top:48px;">No messages yet from this user.</div>';
+        return;
+    }
+
+    let lastDate = '';
+    box.innerHTML = msgs.map(m => {
+        const isUser = m.sender === 'user';
+        const dt     = new Date(m.created_at);
+        const dateStr = dt.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'});
+        const timeStr = dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+        let dateDiv = '';
+        if (dateStr !== lastDate) {
+            lastDate = dateStr;
+            dateDiv = `<div style="text-align:center;margin:8px 0;"><span style="font-size:10.5px;color:var(--muted);background:var(--surface2);padding:3px 10px;border-radius:20px;">${dateStr}</span></div>`;
+        }
+        return dateDiv + `
+        <div style="display:flex;justify-content:${isUser?'flex-start':'flex-end'};gap:8px;align-items:flex-end;">
+            ${isUser ? `<div style="width:28px;height:28px;border-radius:8px;background:rgba(124,58,237,0.2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#A78BFA;flex-shrink:0;margin-bottom:2px;">${escHtml(admCurrentUser.username.charAt(0).toUpperCase())}</div>` : ''}
+            <div style="max-width:72%;">
+                ${isUser ? `<p style="font-size:10px;font-weight:700;color:#A78BFA;margin-bottom:4px;padding-left:2px;">${escHtml(admCurrentUser.username)}</p>` : `<p style="font-size:10px;font-weight:700;color:#FBBF24;margin-bottom:4px;text-align:right;padding-right:2px;">You (Admin)</p>`}
+                <div style="background:${isUser?'rgba(255,255,255,0.06)':'#7C3AED'};color:white;border:${isUser?'1px solid rgba(255,255,255,0.08)':'none'};border-radius:${isUser?'14px 14px 14px 3px':'14px 14px 3px 14px'};padding:10px 14px;font-size:13.5px;line-height:1.6;word-break:break-word;white-space:pre-wrap;">${escHtml(m.message)}</div>
+                <p style="font-size:10px;color:var(--muted);margin-top:3px;text-align:${isUser?'left':'right'};padding:0 2px;font-family:monospace;">${timeStr}</p>
+            </div>
+        </div>`;
+    }).join('');
+
+    if (scroll) box.scrollTop = box.scrollHeight;
+    else {
+        const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+        if (atBottom) box.scrollTop = box.scrollHeight;
+    }
+
+    admLoadUsers(); // refresh list to clear unread badges
+    admCheckUnread();
+}
+
+async function admSendReply() {
+    if (!admCurrentUid) return;
+    const input = document.getElementById('adm-reply-input');
+    const msg   = input.value.trim();
+    if (!msg) return;
+    const btn   = document.getElementById('adm-send-btn');
+    input.value = ''; input.style.height = 'auto';
+    btn.disabled = true; btn.style.opacity = '0.5';
+    await fetch('support_chat.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_reply',user_id:admCurrentUid,message:msg})});
+    await admFetchMessages(true);
+    btn.disabled = false; btn.style.opacity = '1';
+    input.focus();
+}
+
+function escHtml(t) { return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Load users on page load
+admCheckUnread();
+// Refresh user list every 15s for new incoming messages
+setInterval(() => {
+    admCheckUnread();
+    if (admWidgetOpen) admLoadUsers();
+}, 15000);
+</script>
+</div>
+</section>
+<button onclick="toggleAdminSupportWidget()" id="adm-sup-fab" type="button" style="position:fixed;right:24px;bottom:24px;width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#7C3AED,#4F46E5);border:1px solid rgba(167,139,250,0.45);box-shadow:0 12px 30px rgba(124,58,237,0.4);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10060;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+    <span id="adm-sup-fab-dot" style="display:<?php echo $adm_sup_unread > 0 ? 'block' : 'none'; ?>;position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;background:#EF4444;box-shadow:0 0 6px #EF4444;"></span>
+</button>
 
 </main>
 </div>

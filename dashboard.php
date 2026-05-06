@@ -479,7 +479,14 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
       Test Chatbot
     </button>
-
+<button onclick="toggleSupportWidget()" id="nav-support" class="nav-item" style="position:relative;">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+    </svg>
+    Support
+    <span id="sup-nav-dot" style="display:none;position:absolute;top:9px;right:10px;width:8px;height:8px;border-radius:50%;background:#EF4444;box-shadow:0 0 6px #EF4444;"></span>
+</button>
     <span class="sidebar-section-label">Customization</span>
     <?php if($plan_has_cust): ?>
     <a href="chatbot_customize.php?site=<?php echo urlencode($active_site_id); ?>" class="nav-item" style="text-decoration:none;">
@@ -784,7 +791,70 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
     </div>
     <?php endif; ?>
   </section>
-
+<section id="support-section" style="display:none;position:fixed;right:24px;bottom:24px;width:min(92vw,420px);height:min(78vh,640px);z-index:10050;">
+    <div class="card" style="display:flex;flex-direction:column;height:100%;width:100%;box-shadow:0 22px 60px rgba(0,0,0,0.45);border:1px solid var(--accent-border);">
+ 
+        <!-- Header -->
+        <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+            <div>
+                <h1 class="section-title" style="font-size:16px;">Support Chat</h1>
+                <p class="section-sub" style="margin-top:2px;font-size:11.5px;">Manual team reply within 24 hours</p>
+            </div>
+            <button onclick="closeSupportWidget()" type="button" style="border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:16px;line-height:1;">&times;</button>
+        </div>
+ 
+        <!-- Chat window -->
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
+ 
+            <!-- Chat header bar -->
+            <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;">
+                <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#7C3AED,#06B6D4);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                </div>
+                <div>
+                    <p style="font-size:13.5px;font-weight:700;color:white;">Bitchatbot Support</p>
+                    <div style="display:flex;align-items:center;gap:5px;margin-top:2px;">
+                        <span style="width:6px;height:6px;border-radius:50%;background:#34D399;display:inline-block;"></span>
+                        <span style="font-size:11.5px;color:var(--text-muted);">We reply within 24 hours</span>
+                    </div>
+                </div>
+            </div>
+ 
+            <!-- Messages area -->
+            <div id="sup-messages" style="flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;min-height:0;">
+                <!-- Loading -->
+                <div id="sup-loading" style="text-align:center;padding-top:48px;">
+                    <div style="width:36px;height:36px;border:2px solid rgba(99,102,241,0.2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;"></div>
+                    <p style="font-size:13px;color:var(--text-muted);">Loading chat...</p>
+                </div>
+            </div>
+ 
+            <!-- Input bar -->
+            <div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0;align-items:flex-end;">
+                <textarea
+                    id="sup-input"
+                    rows="1"
+                    placeholder="Type your message... (Enter to send)"
+                    style="flex:1;resize:none;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;outline:none;font-family:'DM Sans',sans-serif;min-height:42px;max-height:110px;overflow-y:auto;transition:border-color 0.18s;"
+                    onfocus="this.style.borderColor='var(--accent)'"
+                    onblur="this.style.borderColor='var(--border)'"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();supSend();}"
+                    oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';"
+                ></textarea>
+                <button onclick="supSend()" id="sup-send-btn"
+                    style="width:42px;height:42px;border-radius:10px;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.18s;"
+                    onmouseover="this.style.background='#818CF8'"
+                    onmouseout="this.style.background='var(--accent)'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+<button onclick="toggleSupportWidget()" id="sup-fab" type="button" style="position:fixed;right:24px;bottom:24px;width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#7C3AED,#4F46E5);border:1px solid rgba(165,180,252,0.4);box-shadow:0 12px 30px rgba(79,70,229,0.4);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10040;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+    <span id="sup-fab-dot" style="display:none;position:absolute;top:8px;right:8px;width:9px;height:9px;border-radius:50%;background:#EF4444;box-shadow:0 0 6px #EF4444;"></span>
+</button>
   <!-- ════════════════ SETTINGS ════════════════ -->
 <section id="settings-section" style="display:none;">
   <div class="section-header">
@@ -1306,6 +1376,109 @@ function toggleSiteAcc(bodyId, header) {
 
   function escHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function formatTime(dt) { return new Date(dt).toLocaleString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+// ══════ SUPPORT CHAT — USER ══════
+let supPoll = null;
+let supportWidgetOpen = false;
+
+function openSupportWidget() {
+    supportWidgetOpen = true;
+    document.getElementById('support-section').style.display = 'block';
+    document.getElementById('sup-fab').style.display = 'none';
+    supLoadMessages(true);
+    clearInterval(supPoll);
+    supPoll = setInterval(() => supLoadMessages(false), 10000);
+}
+
+function closeSupportWidget() {
+    supportWidgetOpen = false;
+    document.getElementById('support-section').style.display = 'none';
+    document.getElementById('sup-fab').style.display = 'flex';
+    clearInterval(supPoll);
+}
+
+function toggleSupportWidget() {
+    if (supportWidgetOpen) closeSupportWidget();
+    else openSupportWidget();
+}
+ 
+async function supLoadMessages(scroll) {
+    const res  = await fetch('support_chat.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'get_messages'})});
+    const data = await res.json();
+    const box  = document.getElementById('sup-messages');
+    document.getElementById('sup-loading').style.display = 'none';
+ 
+    if (!data.success) return;
+    const msgs = data.messages || [];
+ 
+    if (!msgs.length) {
+        box.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:40px;text-align:center;margin-top:20px;">
+            <div style="font-size:36px;margin-bottom:14px;">👋</div>
+            <p style="font-size:15px;font-weight:700;color:white;margin-bottom:6px;">Hi there!</p>
+            <p style="font-size:13px;color:var(--text-muted);max-width:320px;line-height:1.7;">
+                Got a question or issue? Just type your message below and our support team will reply within <strong style="color:#A5B4FC;">24 hours</strong>.
+            </p>
+        </div>`;
+        return;
+    }
+ 
+    // Group messages by date
+    let lastDate = '';
+    box.innerHTML = msgs.map(m => {
+        const isUser = m.sender === 'user';
+        const dt     = new Date(m.created_at);
+        const dateStr = dt.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'});
+        const timeStr = dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+        let dateDiv = '';
+        if (dateStr !== lastDate) {
+            lastDate = dateStr;
+            dateDiv = `<div style="text-align:center;margin:8px 0;"><span style="font-size:10.5px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:20px;">${dateStr}</span></div>`;
+        }
+        return dateDiv + `
+        <div style="display:flex;justify-content:${isUser?'flex-end':'flex-start'};gap:8px;align-items:flex-end;">
+            ${!isUser ? `<div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7C3AED,#06B6D4);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-bottom:2px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>` : ''}
+            <div style="max-width:72%;">
+                ${!isUser ? `<p style="font-size:10px;font-weight:700;color:#A5B4FC;margin-bottom:4px;padding-left:2px;">Support Team</p>` : ''}
+                <div style="background:${isUser?'var(--accent)':'var(--surface2)'};color:white;border:${isUser?'none':'1px solid var(--border)'};border-radius:${isUser?'14px 14px 3px 14px':'14px 14px 14px 3px'};padding:10px 14px;font-size:13.5px;line-height:1.6;word-break:break-word;white-space:pre-wrap;">${escHtml(m.message)}</div>
+                <p style="font-size:10px;color:var(--text-dim);margin-top:3px;text-align:${isUser?'right':'left'};padding:0 2px;">${timeStr}</p>
+            </div>
+        </div>`;
+    }).join('');
+ 
+    if (scroll !== false) box.scrollTop = box.scrollHeight;
+    // Update nav dot
+    document.getElementById('sup-nav-dot').style.display = 'none';
+    document.getElementById('sup-fab-dot').style.display = 'none';
+}
+ 
+async function supSend() {
+    const input = document.getElementById('sup-input');
+    const msg   = input.value.trim();
+    if (!msg) return;
+    input.value = ''; input.style.height = 'auto';
+    const btn   = document.getElementById('sup-send-btn');
+    btn.disabled = true; btn.style.opacity = '0.5';
+ 
+    await fetch('support_chat.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send',message:msg})});
+    await supLoadMessages(true);
+ 
+    btn.disabled = false; btn.style.opacity = '1';
+    input.focus();
+}
+ 
+async function supCheckUnread() {
+    const res  = await fetch('support_chat.php', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'unread'})});
+    const data = await res.json();
+    if (data.success) {
+        const shouldShow = data.count > 0 && !supportWidgetOpen;
+        document.getElementById('sup-nav-dot').style.display = shouldShow ? 'block' : 'none';
+        document.getElementById('sup-fab-dot').style.display = shouldShow ? 'block' : 'none';
+    }
+}
+ 
+// Check unread on load + every 30s
+supCheckUnread();
+setInterval(supCheckUnread, 30000);
   </script>
   </body>
   </html>
