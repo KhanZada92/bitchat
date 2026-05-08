@@ -353,15 +353,17 @@ function build_pairs_from_raw_text(string $raw): array {
 
 function extract_pdf(string $path): array {
     $extract_pdf_text_fallback = function (string $pdfPath): string {
-        $commands = [
-            'pdftotext -enc UTF-8 -layout ' . escapeshellarg($pdfPath) . ' -',
-            'pdftotext -enc UTF-8 ' . escapeshellarg($pdfPath) . ' -',
-            'mutool draw -F txt -o - ' . escapeshellarg($pdfPath),
-        ];
-        foreach ($commands as $cmd) {
-            $out = @shell_exec($cmd . ' 2>&1');
-            if (is_string($out) && trim($out) !== '') {
-                return trim($out);
+        if (function_exists('shell_exec')) {
+            $commands = [
+                'pdftotext -enc UTF-8 -layout ' . escapeshellarg($pdfPath) . ' -',
+                'pdftotext -enc UTF-8 ' . escapeshellarg($pdfPath) . ' -',
+                'mutool draw -F txt -o - ' . escapeshellarg($pdfPath),
+            ];
+            foreach ($commands as $cmd) {
+                $out = @shell_exec($cmd . ' 2>&1');
+                if (is_string($out) && trim($out) !== '') {
+                    return trim($out);
+                }
             }
         }
 
