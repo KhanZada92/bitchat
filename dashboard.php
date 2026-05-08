@@ -480,7 +480,7 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
       Conversations
       <?php if($total_sessions > 0): ?><span class="nav-badge"><?php echo $total_sessions; ?></span><?php endif; ?>
     </button>
-    <button onclick="showSection('embed')" id="nav-embed" class="nav-item">
+    <button onclick="<?php echo (!$has_any_site ? "openAddSiteModal()" : (!$has_data ? "showSection('upload')" : "showSection('embed')")); ?>" id="nav-embed" class="nav-item<?php echo (!$has_any_site || !$has_data)?' disabled-nav':''; ?>" <?php echo !$has_any_site?'title="Add a site first"':(!$has_data?'title="Upload and train data first"':''); ?>>
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
       Embed Code
     </button>
@@ -1139,6 +1139,7 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
   const sessionsData   = <?php echo json_encode($sessions, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
   const ACTIVE_SITE_ID = <?php echo json_encode($active_site_id); ?>;
   const HAS_ANY_SITE   = <?php echo json_encode($has_any_site); ?>;
+  const HAS_DATA       = <?php echo json_encode($has_data); ?>;
   let selectedFile     = null;
 
   // ── Sidebar toggle ──
@@ -1156,6 +1157,15 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
       if (name === 'upload' && !HAS_ANY_SITE) {
           openAddSiteModal();
           return;
+      }
+      if (name === 'embed') {
+          if (!HAS_ANY_SITE) {
+              openAddSiteModal();
+              return;
+          }
+          if (!HAS_DATA) {
+              name = 'upload';
+          }
       }
       ['overview','upload','conversations','test','embed','settings'].forEach(s => {
           const sec = document.getElementById(s + '-section');

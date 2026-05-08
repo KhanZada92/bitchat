@@ -1,19 +1,4 @@
-<?php
-require_once 'config/main_config.php';
-if (isset($_SESSION['pending_user_id'])) {
-    $pending_id = (int)$_SESSION['pending_user_id'];
-    if ($pending_id > 0) {
-        $pv = $conn->prepare("SELECT is_verified, status, otp FROM users WHERE id = ?");
-        $pv->bind_param("i", $pending_id);
-        $pv->execute();
-        $pu = $pv->get_result()->fetch_assoc();
-        $pv->close();
-        $needs_otp = $pu && (int)($pu['is_verified'] ?? 0) !== 1 && ($pu['status'] ?? '') === 'pending' && !empty($pu['otp']);
-        if ($needs_otp) { header('Location: verify_otp.php'); exit(); }
-        unset($_SESSION['pending_user_id'], $_SESSION['pending_plan']);
-    }
-}
-?>
+<?php require_once 'config/main_config.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
