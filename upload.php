@@ -12,6 +12,21 @@ if (!function_exists('curl_init')) {
     echo json_encode(['success' => false, 'error' => 'Server missing cURL extension.']); exit();
 }
 
+// Always return JSON even on fatal runtime errors (prevents "Invalid server response").
+set_exception_handler(function (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Upload failed: ' . $e->getMessage()]);
+    exit();
+});
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        http_response_code(500);
+        if (!headers_sent()) header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Upload failed: ' . ($err['message'] ?? 'Server error')]);
+    }
+});
+
 // ── Auth ──────────────────────────────────────────────
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']); exit();
@@ -216,16 +231,36 @@ function parse_qa_inline_pairs(string $text): array {
 }
 
 function clean_text_for_qa(string $text): string {
+    // Normalize potentially binary/non-UTF8 text (common in raw PDF extraction).
+    if (!preg_match('//u', $text)) {
+        $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $text);
+        if (is_string($converted)) $text = $converted;
+    }
     $text = str_replace(["\r\n", "\r"], "\n", $text);
-    $text = preg_replace('/[ \t]+/u', ' ', $text);
-    $text = preg_replace('/\n{3,}/u', "\n\n", $text);
+    $text = preg_replace('/[ \t]+/', ' ', $text);
+    if (!is_string($text)) $text = '';
+    $text = preg_replace('/\n{3,}/', "\n\n", $text);
+    if (!is_string($text)) $text = '';
     return trim((string)$text);
+}
+
+function ulen(string $s): int {
+    return function_exists('mb_strlen') ? (int)mb_strlen($s) : strlen($s);
+}
+function usub(string $s, int $start, ?int $len = null): string {
+    if (function_exists('mb_substr')) {
+        return $len === null ? (string)mb_substr($s, $start) : (string)mb_substr($s, $start, $len);
+    }
+    return $len === null ? substr($s, $start) : substr($s, $start, $len);
+}
+function ulower(string $s): string {
+    return function_exists('mb_strtolower') ? (string)mb_strtolower($s) : strtolower($s);
 }
 
 function make_question_from_answer(string $answer, int $idx): string {
     $parts = preg_split('/(?<=[\.\!\?])\s+/u', $answer, 2);
     $firstSentence = trim((string)($parts[0] ?? ''));
-    if ($firstSentence !== '' && mb_substr($firstSentence, -1) === '?') {
+    if ($firstSentence !== '' && usub($firstSentence, -1) === '?') {
         return $firstSentence;
     }
     $title = trim(preg_replace('/[^\p{L}\p{N}\s]/u', '', $firstSentence));
@@ -243,7 +278,7 @@ function build_pairs_from_raw_text(string $raw): array {
     $pairs = [];
     $paragraphs = preg_split('/\n\s*\n/u', $raw);
     $paragraphs = array_values(array_filter(array_map('trim', $paragraphs), function ($p) {
-        return mb_strlen($p) >= 30;
+        return ulen($p) >= 30;
     }));
 
     foreach ($paragraphs as $pidx => $para) {
@@ -255,11 +290,11 @@ function build_pairs_from_raw_text(string $raw): array {
         $chunkLen = 0;
         foreach ($sentences as $s) {
             $chunk[] = $s;
-            $chunkLen += mb_strlen($s);
+            $chunkLen += ulen($s);
             // Keep chunks reasonably small so one giant paragraph isn't one answer.
             if ($chunkLen >= 260 || count($chunk) >= 3) {
                 $ans = trim(implode(' ', $chunk));
-                if (mb_strlen($ans) >= 30) {
+                if (ulen($ans) >= 30) {
                     $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
                 }
                 $chunk = [];
@@ -268,7 +303,7 @@ function build_pairs_from_raw_text(string $raw): array {
         }
         if (!empty($chunk)) {
             $ans = trim(implode(' ', $chunk));
-            if (mb_strlen($ans) >= 30) {
+            if (ulen($ans) >= 30) {
                 $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
             }
         }
@@ -278,16 +313,16 @@ function build_pairs_from_raw_text(string $raw): array {
         $pairs = [];
         $sentences = preg_split('/(?<=[\.\!\?])\s+/u', $raw);
         $sentences = array_values(array_filter(array_map('trim', $sentences), function ($s) {
-            return mb_strlen($s) > 5;
+            return ulen($s) > 5;
         }));
         $chunk = [];
         $chunkLen = 0;
         foreach ($sentences as $s) {
             $chunk[] = $s;
-            $chunkLen += mb_strlen($s);
+            $chunkLen += ulen($s);
             if ($chunkLen >= 220 || count($chunk) >= 3) {
                 $ans = trim(implode(' ', $chunk));
-                if (mb_strlen($ans) >= 30) {
+                if (ulen($ans) >= 30) {
                     $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
                 }
                 $chunk = [];
@@ -296,7 +331,7 @@ function build_pairs_from_raw_text(string $raw): array {
         }
         if (!empty($chunk)) {
             $ans = trim(implode(' ', $chunk));
-            if (mb_strlen($ans) >= 30) {
+            if (ulen($ans) >= 30) {
                 $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
             }
         }
@@ -307,8 +342,8 @@ function build_pairs_from_raw_text(string $raw): array {
     foreach ($pairs as $pair) {
         $q = trim((string)($pair['question'] ?? ''));
         $a = trim((string)($pair['answer'] ?? ''));
-        if (mb_strlen($q) < 6 || mb_strlen($a) < 20) continue;
-        $key = mb_strtolower($q . '|' . mb_substr($a, 0, 120));
+        if (ulen($q) < 6 || ulen($a) < 20) continue;
+        $key = ulower($q . '|' . usub($a, 0, 120));
         if (isset($seen[$key])) continue;
         $seen[$key] = true;
         $out[] = ['question' => $q, 'answer' => $a];
