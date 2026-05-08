@@ -13,6 +13,10 @@ try {
         echo json_encode(['error' => 'Please login first']);
         exit();
     }
+    if (!isset($_SESSION['is_verified']) || (int)$_SESSION['is_verified'] !== 1) {
+        echo json_encode(['error' => 'Please verify OTP before selecting a plan.']);
+        exit();
+    }
 
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         echo json_encode(['error' => 'Invalid request method']);

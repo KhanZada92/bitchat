@@ -1239,11 +1239,20 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
       fd.append('site_ref', ACTIVE_SITE_ID);
       try {
           const res  = await fetch('upload.php', { method: 'POST', body: fd });
-          const data = await res.json();
+          const raw  = await res.text();
+          let data;
+          try {
+              data = JSON.parse(raw);
+          } catch (_) {
+              throw new Error('Invalid server response: ' + raw.slice(0, 180));
+          }
           clearInterval(iv);
           document.getElementById('uploadProgress').style.display = 'none';
           const result = document.getElementById('uploadResult');
           result.style.display = 'block';
+          if (!res.ok) {
+              throw new Error(data.error || ('Upload failed with status ' + res.status));
+          }
           if (data.success) {
               result.innerHTML = `<div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--radius);padding:16px;">
                   <p style="font-weight:700;color:var(--green);font-size:13.5px;margin-bottom:4px;">Upload Successful ✅</p>
@@ -1261,7 +1270,7 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
           clearInterval(iv);
           document.getElementById('uploadProgress').style.display = 'none';
           document.getElementById('uploadResult').style.display = 'block';
-          document.getElementById('uploadResult').innerHTML = `<div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--radius);padding:16px;"><p style="color:var(--red);">Network error. Please try again.</p></div>`;
+          document.getElementById('uploadResult').innerHTML = `<div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--radius);padding:16px;"><p style="color:var(--red);">${escHtml(e.message || 'Upload failed. Please try again.')}</p></div>`;
           document.getElementById('uploadBtn').disabled = false;
       }
   }

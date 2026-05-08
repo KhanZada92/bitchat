@@ -1,8 +1,16 @@
 <?php
 require_once 'config/main_config.php';
-require_once __DIR__ . '/vendor/autoload.php';
+
+$vendorAutoload = __DIR__ . '/vendor/autoload.php';
+if (file_exists($vendorAutoload)) {
+    require_once $vendorAutoload;
+}
 
 header('Content-Type: application/json');
+
+if (!function_exists('curl_init')) {
+    echo json_encode(['success' => false, 'error' => 'Server missing cURL extension.']); exit();
+}
 
 // ── Auth ──────────────────────────────────────────────
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in'])) {
@@ -62,6 +70,10 @@ error_log("[upload] site_id: $site_id | user_id: $user_id");
 
 // ── 3. DOCX extractor ────────────────────────────────
 function extract_docx(string $path): array {
+    if (!class_exists('\PhpOffice\PhpWord\IOFactory')) {
+        error_log("[upload] DOCX library missing: phpoffice/phpword");
+        return [];
+    }
     try {
         $phpWord  = \PhpOffice\PhpWord\IOFactory::load($path);
         $pairs    = [];
@@ -161,6 +173,10 @@ function parse_qa_strict(string $text): array {
 }
 
 function extract_pdf(string $path): array {
+    if (!class_exists('\Smalot\PdfParser\Parser')) {
+        error_log("[upload] PDF library missing: smalot/pdfparser");
+        return [];
+    }
     try {
         $parser = new \Smalot\PdfParser\Parser();
         $text   = $parser->parseFile($path)->getText();

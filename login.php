@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($password)) $errors[] = "Password is required";
 
     if (empty($errors)) {
-        $stmt = $conn->prepare("SELECT id, username, email, password, site_id, role, status, plan, email_consent FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT id, username, email, password, site_id, role, status, plan, is_verified, email_consent FROM users WHERE email = ?");
         $stmt->bind_param("s", $email); $stmt->execute();
         $result = $stmt->get_result();
 
@@ -36,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['role']      = $user['role'] ?? 'client';
                 $_SESSION['status']    = $user['status'] ?? 'pending';
                 $_SESSION['plan']      = $user['plan'] ?? null;
+                $_SESSION['is_verified'] = (int)($user['is_verified'] ?? 0);
                 $_SESSION['logged_in'] = true;
 
                 // Update last_login
@@ -57,6 +58,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($user['role'] === 'admin') {
                     header('Location: admin.php'); exit();
+                }
+
+                // Enforce OTP verification before any plan/dashboard access
+                if ((int)($user['is_verified'] ?? 0) !== 1) {
+                    $_SESSION['pending_user_id'] = $user['id'];
+                    if (!empty($_SESSION['selected_plan'])) {
+                        $_SESSION['pending_plan'] = $_SESSION['selected_plan'];
+                    }
+                    header('Location: verify_otp.php'); exit();
                 }
                 
                 // Check plan status

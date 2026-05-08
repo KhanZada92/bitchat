@@ -10,6 +10,9 @@ header('Content-Type: application/json');
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'error' => 'Please login first.']); exit();
 }
+if (!isset($_SESSION['is_verified']) || (int)$_SESSION['is_verified'] !== 1) {
+    echo json_encode(['success' => false, 'error' => 'Please verify OTP before applying a coupon.']); exit();
+}
 if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'GET'], true)) {
     echo json_encode(['success' => false, 'error' => 'Invalid request method.']); exit();
 }
