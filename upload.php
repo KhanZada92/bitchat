@@ -331,6 +331,28 @@ function extract_pdf(string $path): array {
             }
         }
 
+        // Python fallback (if python + pypdf/PyPDF2 available on host).
+        $pyScript = "import sys\n"
+            . "p=sys.argv[1]\n"
+            . "txt=''\n"
+            . "try:\n"
+            . " import pypdf as lib\n"
+            . " r=lib.PdfReader(p)\n"
+            . " txt='\\n'.join([(pg.extract_text() or '') for pg in r.pages])\n"
+            . "except Exception:\n"
+            . " try:\n"
+            . "  import PyPDF2 as lib\n"
+            . "  r=lib.PdfReader(p)\n"
+            . "  txt='\\n'.join([(pg.extract_text() or '') for pg in r.pages])\n"
+            . " except Exception:\n"
+            . "  pass\n"
+            . "print(txt)\n";
+        $pyCmd = 'python -c ' . escapeshellarg($pyScript) . ' ' . escapeshellarg($pdfPath);
+        $pyOut = @shell_exec($pyCmd . ' 2>&1');
+        if (is_string($pyOut) && trim($pyOut) !== '') {
+            return trim($pyOut);
+        }
+
         // Primitive PDF text recovery for simple text PDFs.
         $bin = @file_get_contents($pdfPath);
         if (!is_string($bin) || $bin === '') return '';

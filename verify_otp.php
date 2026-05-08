@@ -243,9 +243,14 @@ const iv = setInterval(() => {
 }, 1000);
 
 // Strictly block browser back while on OTP verification.
-history.pushState(null, '', location.href);
+history.replaceState({otpLock: true}, '', location.href);
+history.pushState({otpLock: true}, '', location.href);
+history.pushState({otpLock: true}, '', location.href);
 window.addEventListener('popstate', function () {
-    history.pushState(null, '', location.href);
+    history.pushState({otpLock: true}, '', location.href);
+});
+window.addEventListener('pageshow', function () {
+    history.pushState({otpLock: true}, '', location.href);
 });
 </script>
 </body>
