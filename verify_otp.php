@@ -241,6 +241,12 @@ const iv = setInterval(() => {
     if(sec <= 0){ clearInterval(iv); timerEl.textContent='Expired'; timerEl.style.color='#EF4444'; return; }
     timerEl.textContent = Math.floor(sec/60).toString().padStart(2,'0')+':'+(sec%60).toString().padStart(2,'0');
 }, 1000);
+
+// Strictly block browser back while on OTP verification.
+history.pushState(null, '', location.href);
+window.addEventListener('popstate', function () {
+    history.pushState(null, '', location.href);
+});
 </script>
 </body>
 </html>

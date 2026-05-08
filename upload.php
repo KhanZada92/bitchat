@@ -199,6 +199,22 @@ function parse_qa_strict(string $text): array {
     return $pairs;
 }
 
+function parse_qa_inline_pairs(string $text): array {
+    $text = clean_text_for_qa($text);
+    if ($text === '') return [];
+    $pairs = [];
+
+    // Handles formats like: Q1: ... A1: ... Q2: ... A2: ...
+    if (preg_match_all('/Q\d*\s*[:\.\-]\s*(.*?)\s*A\d*\s*[:\.\-]\s*(.*?)(?=Q\d*\s*[:\.\-]|$)/isu', $text, $m, PREG_SET_ORDER)) {
+        foreach ($m as $row) {
+            $q = trim((string)($row[1] ?? ''));
+            $a = trim((string)($row[2] ?? ''));
+            if ($q !== '' && $a !== '') $pairs[] = ['question' => $q, 'answer' => $a];
+        }
+    }
+    return $pairs;
+}
+
 function clean_text_for_qa(string $text): string {
     $text = str_replace(["\r\n", "\r"], "\n", $text);
     $text = preg_replace('/[ \t]+/u', ' ', $text);
@@ -309,7 +325,7 @@ function extract_pdf(string $path): array {
             'mutool draw -F txt -o - ' . escapeshellarg($pdfPath),
         ];
         foreach ($commands as $cmd) {
-            $out = @shell_exec($cmd . ' 2>NUL');
+            $out = @shell_exec($cmd . ' 2>&1');
             if (is_string($out) && trim($out) !== '') {
                 return trim($out);
             }
@@ -360,6 +376,9 @@ function extract_pdf(string $path): array {
 
         $pairs  = parse_qa_strict($text);
         if (empty($pairs)) {
+            $pairs = parse_qa_inline_pairs($text);
+        }
+        if (empty($pairs)) {
             $pairs = build_pairs_from_raw_text($text);
         }
         if (empty($pairs)) {
@@ -382,7 +401,12 @@ function extract_pdf(string $path): array {
         return $pairs;
     } catch (\Exception $e) {
         error_log("[upload] PDF error: " . $e->getMessage());
-        return [];
+        $fallbackText = $extract_pdf_text_fallback($path);
+        if (!is_string($fallbackText) || trim($fallbackText) === '') return [];
+        $pairs = parse_qa_strict($fallbackText);
+        if (empty($pairs)) $pairs = parse_qa_inline_pairs($fallbackText);
+        if (empty($pairs)) $pairs = build_pairs_from_raw_text($fallbackText);
+        return $pairs;
     }
 }
 

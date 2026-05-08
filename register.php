@@ -12,6 +12,23 @@ if (isset($_GET['plan']) && in_array($_GET['plan'], $allowed_plans)) {
     $selected_plan = $_SESSION['selected_plan'];
 }
 
+// If user is already in pending OTP flow, force verification page.
+if (isset($_SESSION['pending_user_id'])) {
+    $pending_id = (int)$_SESSION['pending_user_id'];
+    if ($pending_id > 0) {
+        $pv = $conn->prepare("SELECT is_verified, status, otp FROM users WHERE id = ?");
+        $pv->bind_param("i", $pending_id);
+        $pv->execute();
+        $pu = $pv->get_result()->fetch_assoc();
+        $pv->close();
+        $needs_otp = $pu && (int)($pu['is_verified'] ?? 0) !== 1 && ($pu['status'] ?? '') === 'pending' && !empty($pu['otp']);
+        if ($needs_otp) {
+            header('Location: verify_otp.php'); exit();
+        }
+        unset($_SESSION['pending_user_id'], $_SESSION['pending_plan']);
+    }
+}
+
 // Already logged in
 if (isset($_SESSION['user_id'])) {
     if ($_SESSION['role'] === 'admin') { header('Location: admin.php'); exit(); }
