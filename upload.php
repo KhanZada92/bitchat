@@ -148,6 +148,9 @@ function extract_docx(string $path): array {
                 }
             }
             $pairs = parse_qa_strict($rawText);
+            if (empty($pairs)) {
+                $pairs = build_pairs_from_raw_text($rawText);
+            }
         }
         return $pairs;
     } catch (\Exception $e) {
@@ -172,6 +175,108 @@ function parse_qa_strict(string $text): array {
     return $pairs;
 }
 
+function clean_text_for_qa(string $text): string {
+    $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $text = preg_replace('/[ \t]+/u', ' ', $text);
+    $text = preg_replace('/\n{3,}/u', "\n\n", $text);
+    return trim((string)$text);
+}
+
+function make_question_from_answer(string $answer, int $idx): string {
+    $parts = preg_split('/(?<=[\.\!\?])\s+/u', $answer, 2);
+    $firstSentence = trim((string)($parts[0] ?? ''));
+    if ($firstSentence !== '' && mb_substr($firstSentence, -1) === '?') {
+        return $firstSentence;
+    }
+    $title = trim(preg_replace('/[^\p{L}\p{N}\s]/u', '', $firstSentence));
+    $words = preg_split('/\s+/u', $title);
+    $words = array_slice(array_filter($words), 0, 10);
+    $title = trim(implode(' ', $words));
+    if ($title === '') $title = 'Topic ' . $idx;
+    return "Explain: {$title}?";
+}
+
+function build_pairs_from_raw_text(string $raw): array {
+    $raw = clean_text_for_qa($raw);
+    if ($raw === '') return [];
+
+    $pairs = [];
+    $paragraphs = preg_split('/\n\s*\n/u', $raw);
+    $paragraphs = array_values(array_filter(array_map('trim', $paragraphs), function ($p) {
+        return mb_strlen($p) >= 30;
+    }));
+
+    foreach ($paragraphs as $pidx => $para) {
+        if (mb_strlen($para) > 1200) {
+            $sentences = preg_split('/(?<=[\.\!\?])\s+/u', $para);
+            $sentences = array_values(array_filter(array_map('trim', $sentences)));
+            $chunk = [];
+            $chunkLen = 0;
+            foreach ($sentences as $s) {
+                $chunk[] = $s;
+                $chunkLen += mb_strlen($s);
+                if ($chunkLen >= 300 || count($chunk) >= 4) {
+                    $ans = trim(implode(' ', $chunk));
+                    if (mb_strlen($ans) >= 40) {
+                        $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
+                    }
+                    $chunk = [];
+                    $chunkLen = 0;
+                }
+            }
+            if (!empty($chunk)) {
+                $ans = trim(implode(' ', $chunk));
+                if (mb_strlen($ans) >= 40) {
+                    $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
+                }
+            }
+            continue;
+        }
+        $pairs[] = ['question' => make_question_from_answer($para, $pidx + 1), 'answer' => $para];
+    }
+
+    if (count($pairs) < 2) {
+        $pairs = [];
+        $sentences = preg_split('/(?<=[\.\!\?])\s+/u', $raw);
+        $sentences = array_values(array_filter(array_map('trim', $sentences), function ($s) {
+            return mb_strlen($s) > 5;
+        }));
+        $chunk = [];
+        $chunkLen = 0;
+        foreach ($sentences as $s) {
+            $chunk[] = $s;
+            $chunkLen += mb_strlen($s);
+            if ($chunkLen >= 220 || count($chunk) >= 3) {
+                $ans = trim(implode(' ', $chunk));
+                if (mb_strlen($ans) >= 30) {
+                    $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
+                }
+                $chunk = [];
+                $chunkLen = 0;
+            }
+        }
+        if (!empty($chunk)) {
+            $ans = trim(implode(' ', $chunk));
+            if (mb_strlen($ans) >= 30) {
+                $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
+            }
+        }
+    }
+
+    $out = [];
+    $seen = [];
+    foreach ($pairs as $pair) {
+        $q = trim((string)($pair['question'] ?? ''));
+        $a = trim((string)($pair['answer'] ?? ''));
+        if (mb_strlen($q) < 6 || mb_strlen($a) < 20) continue;
+        $key = mb_strtolower($q . '|' . mb_substr($a, 0, 120));
+        if (isset($seen[$key])) continue;
+        $seen[$key] = true;
+        $out[] = ['question' => $q, 'answer' => $a];
+    }
+    return $out;
+}
+
 function extract_pdf(string $path): array {
     if (!class_exists('\Smalot\PdfParser\Parser')) {
         error_log("[upload] PDF library missing: smalot/pdfparser");
@@ -181,6 +286,9 @@ function extract_pdf(string $path): array {
         $parser = new \Smalot\PdfParser\Parser();
         $text   = $parser->parseFile($path)->getText();
         $pairs  = parse_qa_strict($text);
+        if (empty($pairs)) {
+            $pairs = build_pairs_from_raw_text($text);
+        }
         if (empty($pairs)) {
             $lines = array_values(array_filter(array_map('trim', explode("\n", $text))));
             $q = null; $a = []; $out = [];
@@ -194,6 +302,9 @@ function extract_pdf(string $path): array {
             }
             if ($q && $a) $out[] = ['question'=>$q,'answer'=>trim(implode(' ',$a))];
             $pairs = $out;
+            if (empty($pairs)) {
+                $pairs = build_pairs_from_raw_text($text);
+            }
         }
         return $pairs;
     } catch (\Exception $e) {
@@ -261,14 +372,19 @@ function extract_json(string $path): array {
     // ── Format 5: Raw text array ["Q: ... A: ..."] ──
     if (isset($data[0]) && is_string($data[0])) {
         $combined = implode("\n", $data);
-        return parse_qa_strict($combined);
+        $strict = parse_qa_strict($combined);
+        return !empty($strict) ? $strict : build_pairs_from_raw_text($combined);
     }
 
     // ── Format 6: Single string (raw text stored as JSON string) ──
     if (is_string($data)) {
-        return parse_qa_strict($data);
+        $strict = parse_qa_strict($data);
+        return !empty($strict) ? $strict : build_pairs_from_raw_text($data);
     }
 
+    if (empty($pairs)) {
+        $pairs = build_pairs_from_raw_text($raw);
+    }
     return $pairs;
 }
 
@@ -281,7 +397,7 @@ switch ($ext) {
 }
 
 if (empty($qa_pairs)) {
-    echo json_encode(['success'=>false,'error'=>'No Q&A pairs found. Check file format.']); exit();
+    echo json_encode(['success'=>false,'error'=>'Could not extract meaningful content from file. Please upload a readable document with actual text.']); exit();
 }
 
 // ── 8. Write temp JSON ────────────────────────────────
