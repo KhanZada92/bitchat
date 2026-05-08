@@ -247,32 +247,31 @@ function build_pairs_from_raw_text(string $raw): array {
     }));
 
     foreach ($paragraphs as $pidx => $para) {
-        if (mb_strlen($para) > 1200) {
-            $sentences = preg_split('/(?<=[\.\!\?])\s+/u', $para);
-            $sentences = array_values(array_filter(array_map('trim', $sentences)));
-            $chunk = [];
-            $chunkLen = 0;
-            foreach ($sentences as $s) {
-                $chunk[] = $s;
-                $chunkLen += mb_strlen($s);
-                if ($chunkLen >= 300 || count($chunk) >= 4) {
-                    $ans = trim(implode(' ', $chunk));
-                    if (mb_strlen($ans) >= 40) {
-                        $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
-                    }
-                    $chunk = [];
-                    $chunkLen = 0;
-                }
-            }
-            if (!empty($chunk)) {
+        $sentences = preg_split('/(?<=[\.\!\?])\s+/u', $para);
+        $sentences = array_values(array_filter(array_map('trim', $sentences)));
+        if (empty($sentences)) $sentences = [trim($para)];
+
+        $chunk = [];
+        $chunkLen = 0;
+        foreach ($sentences as $s) {
+            $chunk[] = $s;
+            $chunkLen += mb_strlen($s);
+            // Keep chunks reasonably small so one giant paragraph isn't one answer.
+            if ($chunkLen >= 260 || count($chunk) >= 3) {
                 $ans = trim(implode(' ', $chunk));
-                if (mb_strlen($ans) >= 40) {
+                if (mb_strlen($ans) >= 30) {
                     $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
                 }
+                $chunk = [];
+                $chunkLen = 0;
             }
-            continue;
         }
-        $pairs[] = ['question' => make_question_from_answer($para, $pidx + 1), 'answer' => $para];
+        if (!empty($chunk)) {
+            $ans = trim(implode(' ', $chunk));
+            if (mb_strlen($ans) >= 30) {
+                $pairs[] = ['question' => make_question_from_answer($ans, count($pairs) + 1), 'answer' => $ans];
+            }
+        }
     }
 
     if (count($pairs) < 2) {
@@ -331,7 +330,29 @@ function extract_pdf(string $path): array {
             }
         }
 
-        // Primitive PDF text recovery for simple text PDFs.
+        $decodePdfLiteral = function (string $v): string {
+            $v = preg_replace('/\\\\([nrtbf\\\\\(\)])/u', "\n", $v);
+            return stripcslashes($v);
+        };
+        $decodePdfHex = function (string $hex): string {
+            $hex = preg_replace('/[^0-9A-Fa-f]/', '', $hex);
+            if ($hex === '') return '';
+            if (strlen($hex) % 2 === 1) $hex .= '0';
+            $bin = @hex2bin($hex);
+            if (!is_string($bin) || $bin === '') return '';
+            // UTF-16BE with BOM or null bytes
+            if (substr($bin, 0, 2) === "\xFE\xFF") {
+                $txt = @iconv('UTF-16BE', 'UTF-8//IGNORE', substr($bin, 2));
+                if (is_string($txt) && $txt !== '') return $txt;
+            }
+            if (strpos($bin, "\x00") !== false) {
+                $txt = @iconv('UTF-16BE', 'UTF-8//IGNORE', $bin);
+                if (is_string($txt) && trim($txt) !== '') return $txt;
+            }
+            return $bin;
+        };
+
+        // Primitive PDF text recovery for simple and hex-encoded text PDFs.
         $bin = @file_get_contents($pdfPath);
         if (!is_string($bin) || $bin === '') return '';
         $textParts = [];
@@ -344,15 +365,26 @@ function extract_pdf(string $path): array {
                 if (!is_string($decoded)) $decoded = $s;
                 if (preg_match_all('/\((?:\\\\.|[^\\\\)])*\)\s*Tj/s', $decoded, $m1)) {
                     foreach ($m1[0] as $chunk) {
-                        if (preg_match('/\((.*)\)\s*Tj/s', $chunk, $m2)) $textParts[] = stripcslashes($m2[1]);
+                        if (preg_match('/\((.*)\)\s*Tj/s', $chunk, $m2)) $textParts[] = $decodePdfLiteral($m2[1]);
+                    }
+                }
+                if (preg_match_all('/<([0-9A-Fa-f\s]+)>\s*Tj/s', $decoded, $mHex)) {
+                    foreach ($mHex[1] as $hexToken) {
+                        $txt = $decodePdfHex($hexToken);
+                        if (trim($txt) !== '') $textParts[] = $txt;
                     }
                 }
                 if (preg_match_all('/\[(.*?)\]\s*TJ/s', $decoded, $m3)) {
                     foreach ($m3[1] as $arr) {
                         if (preg_match_all('/\((?:\\\\.|[^\\\\)])*\)/s', $arr, $m4)) {
                             $line = '';
-                            foreach ($m4[0] as $t) $line .= stripcslashes(trim($t, '()'));
+                            foreach ($m4[0] as $t) $line .= $decodePdfLiteral(trim($t, '()'));
                             if (trim($line) !== '') $textParts[] = $line;
+                        }
+                        if (preg_match_all('/<([0-9A-Fa-f\s]+)>/s', $arr, $m5)) {
+                            $lineHex = '';
+                            foreach ($m5[1] as $hx) $lineHex .= $decodePdfHex($hx);
+                            if (trim($lineHex) !== '') $textParts[] = $lineHex;
                         }
                     }
                 }
