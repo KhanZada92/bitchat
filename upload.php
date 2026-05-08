@@ -651,6 +651,14 @@ $qa_count     = count($qa_pairs);
 $drive_id     = $res['id'] ?? '';
 $now_dt       = date('Y-m-d H:i:s');
 
+// Mark previous successful uploads for this site as replaced.
+$mark_old = $conn->prepare("UPDATE uploads SET status='replaced' WHERE user_id=? AND site_id=? AND status='done'");
+if ($mark_old) {
+    $mark_old->bind_param("is", $user_id, $site_id);
+    $mark_old->execute();
+    $mark_old->close();
+}
+
 $ins = $conn->prepare("INSERT INTO uploads (user_id, site_id, filename, file_size_kb, qa_count, status, created_at, drive_file_id) VALUES (?, ?, ?, ?, ?, 'done', ?, ?)");
 $ins->bind_param("issiiis", $user_id, $site_id, $json_filename, $file_size_kb, $qa_count, $now_dt, $drive_id);
 $ins->execute(); $ins->close();
