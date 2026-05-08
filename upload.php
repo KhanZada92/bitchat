@@ -69,10 +69,34 @@ $chk->close();
 error_log("[upload] site_id: $site_id | user_id: $user_id");
 
 // ── 3. DOCX extractor ────────────────────────────────
+function extract_docx_text_zip(string $path): string {
+    if (!class_exists('ZipArchive')) return '';
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) return '';
+    $parts = [];
+    foreach (['word/document.xml', 'word/header1.xml', 'word/header2.xml', 'word/footer1.xml', 'word/footer2.xml'] as $entry) {
+        $xml = $zip->getFromName($entry);
+        if ($xml !== false && $xml !== '') $parts[] = $xml;
+    }
+    $zip->close();
+    if (empty($parts)) return '';
+    $xml = implode("\n", $parts);
+    $xml = str_replace(['</w:p>', '</w:tr>', '</w:tbl>'], ["\n", "\n", "\n"], $xml);
+    $text = preg_replace('/<[^>]+>/u', ' ', $xml);
+    $text = html_entity_decode((string)$text, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    $text = preg_replace('/[ \t]+/u', ' ', $text);
+    $text = preg_replace('/\n{2,}/u', "\n\n", $text);
+    return trim((string)$text);
+}
+
 function extract_docx(string $path): array {
     if (!class_exists('\PhpOffice\PhpWord\IOFactory')) {
-        error_log("[upload] DOCX library missing: phpoffice/phpword");
-        return [];
+        error_log("[upload] DOCX library missing: phpoffice/phpword, using zip fallback");
+        $rawText = extract_docx_text_zip($path);
+        if ($rawText === '') return [];
+        $pairs = parse_qa_strict($rawText);
+        if (empty($pairs)) $pairs = build_pairs_from_raw_text($rawText);
+        return $pairs;
     }
     try {
         $phpWord  = \PhpOffice\PhpWord\IOFactory::load($path);
@@ -278,13 +302,62 @@ function build_pairs_from_raw_text(string $raw): array {
 }
 
 function extract_pdf(string $path): array {
-    if (!class_exists('\Smalot\PdfParser\Parser')) {
-        error_log("[upload] PDF library missing: smalot/pdfparser");
-        return [];
-    }
+    $extract_pdf_text_fallback = function (string $pdfPath): string {
+        $commands = [
+            'pdftotext -enc UTF-8 -layout ' . escapeshellarg($pdfPath) . ' -',
+            'pdftotext -enc UTF-8 ' . escapeshellarg($pdfPath) . ' -',
+            'mutool draw -F txt -o - ' . escapeshellarg($pdfPath),
+        ];
+        foreach ($commands as $cmd) {
+            $out = @shell_exec($cmd . ' 2>NUL');
+            if (is_string($out) && trim($out) !== '') {
+                return trim($out);
+            }
+        }
+
+        // Primitive PDF text recovery for simple text PDFs.
+        $bin = @file_get_contents($pdfPath);
+        if (!is_string($bin) || $bin === '') return '';
+        $textParts = [];
+        if (preg_match_all('/stream(.*?)endstream/s', $bin, $matches)) {
+            foreach ($matches[1] as $stream) {
+                $s = ltrim($stream, "\r\n");
+                $decoded = @gzuncompress($s);
+                if (!is_string($decoded)) $decoded = @gzdecode($s);
+                if (!is_string($decoded)) $decoded = @gzinflate($s);
+                if (!is_string($decoded)) $decoded = $s;
+                if (preg_match_all('/\((?:\\\\.|[^\\\\)])*\)\s*Tj/s', $decoded, $m1)) {
+                    foreach ($m1[0] as $chunk) {
+                        if (preg_match('/\((.*)\)\s*Tj/s', $chunk, $m2)) $textParts[] = stripcslashes($m2[1]);
+                    }
+                }
+                if (preg_match_all('/\[(.*?)\]\s*TJ/s', $decoded, $m3)) {
+                    foreach ($m3[1] as $arr) {
+                        if (preg_match_all('/\((?:\\\\.|[^\\\\)])*\)/s', $arr, $m4)) {
+                            $line = '';
+                            foreach ($m4[0] as $t) $line .= stripcslashes(trim($t, '()'));
+                            if (trim($line) !== '') $textParts[] = $line;
+                        }
+                    }
+                }
+            }
+        }
+        return trim(implode("\n", $textParts));
+    };
+
     try {
-        $parser = new \Smalot\PdfParser\Parser();
-        $text   = $parser->parseFile($path)->getText();
+        $text = '';
+        if (class_exists('\Smalot\PdfParser\Parser')) {
+            $parser = new \Smalot\PdfParser\Parser();
+            $text   = $parser->parseFile($path)->getText();
+        } else {
+            error_log("[upload] PDF library missing: smalot/pdfparser, using fallback");
+        }
+        if (!is_string($text) || trim($text) === '') {
+            $text = $extract_pdf_text_fallback($path);
+        }
+        if (!is_string($text) || trim($text) === '') return [];
+
         $pairs  = parse_qa_strict($text);
         if (empty($pairs)) {
             $pairs = build_pairs_from_raw_text($text);

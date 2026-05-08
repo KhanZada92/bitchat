@@ -8,13 +8,17 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: login.php'); exit();
 }
 
-$stmt = $conn->prepare("SELECT role, status, plan, is_verified, stripe_subscription_id, coupon_code, coupon_expires_at FROM users WHERE id = ?");
+$stmt = $conn->prepare("SELECT role, status, plan, is_verified, otp, stripe_subscription_id, coupon_code, coupon_expires_at FROM users WHERE id = ?");
 $stmt->bind_param("i", $_SESSION['user_id']); $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
 if ($row) foreach ($row as $k => $v) $_SESSION[$k] = $v;
 
 if ($_SESSION['role'] === 'admin') { header('Location: admin.php'); exit(); }
-if (!isset($_SESSION['is_verified']) || (int)$_SESSION['is_verified'] !== 1) {
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+$needs_otp = (int)($_SESSION['is_verified'] ?? 0) !== 1 && (($_SESSION['status'] ?? '') === 'pending') && !empty($_SESSION['otp']);
+if ($needs_otp) {
     $_SESSION['pending_user_id'] = $_SESSION['user_id'];
     if (!isset($_SESSION['pending_plan']) && isset($_SESSION['selected_plan'])) {
         $_SESSION['pending_plan'] = $_SESSION['selected_plan'];

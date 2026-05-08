@@ -13,12 +13,21 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in'])) {
 }
 
 // ── Fresh user data from DB ──
-$stmt = $conn->prepare("SELECT role, status, site_id, username, email, website_url, plan, upload_limit_mb, coupon_code, coupon_expires_at, max_chatbots, stripe_subscription_id, plan_start_date, plan_expiry_date, email_consent FROM users WHERE id = ?");
+$stmt = $conn->prepare("SELECT role, status, site_id, username, email, website_url, plan, is_verified, otp, upload_limit_mb, coupon_code, coupon_expires_at, max_chatbots, stripe_subscription_id, plan_start_date, plan_expiry_date, email_consent FROM users WHERE id = ?");
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 if ($row) { foreach ($row as $k => $v) $_SESSION[$k] = $v; }
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
+$needs_otp = (int)($_SESSION['is_verified'] ?? 0) !== 1 && (($_SESSION['status'] ?? '') === 'pending') && !empty($_SESSION['otp']);
+if ($needs_otp) {
+    $_SESSION['pending_user_id'] = (int)$_SESSION['user_id'];
+    header('Location: verify_otp.php'); exit();
+}
 
 $is_admin = ($_SESSION['role'] === 'admin');
 

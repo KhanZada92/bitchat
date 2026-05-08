@@ -5,9 +5,15 @@ require_once 'email_notifications.php';
 // Already logged in
 if (isset($_SESSION['user_id'])) {
     if ($_SESSION['role'] === 'admin') { header('Location: admin.php'); exit(); }
-    $chk = $conn->prepare("SELECT plan FROM users WHERE id = ?");
+    $chk = $conn->prepare("SELECT plan, is_verified, status, otp FROM users WHERE id = ?");
     $chk->bind_param("i", $_SESSION['user_id']); $chk->execute();
-    $p = $chk->get_result()->fetch_assoc()['plan'] ?? null; $chk->close();
+    $lr = $chk->get_result()->fetch_assoc(); $chk->close();
+    $p = $lr['plan'] ?? null;
+    $needs_otp = $lr && (int)($lr['is_verified'] ?? 0) !== 1 && ($lr['status'] ?? '') === 'pending' && !empty($lr['otp']);
+    if ($needs_otp) {
+        $_SESSION['pending_user_id'] = (int)$_SESSION['user_id'];
+        header('Location: verify_otp.php'); exit();
+    }
     header('Location: ' . (empty($p) || $p === 'none' ? 'select_plan.php' : 'dashboard.php')); exit();
 }
 
@@ -21,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($password)) $errors[] = "Password is required";
 
     if (empty($errors)) {
-        $stmt = $conn->prepare("SELECT id, username, email, password, site_id, role, status, plan, is_verified, email_consent FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT id, username, email, password, site_id, role, status, plan, is_verified, otp, email_consent FROM users WHERE email = ?");
         $stmt->bind_param("s", $email); $stmt->execute();
         $result = $stmt->get_result();
 
@@ -61,7 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 // Enforce OTP verification before any plan/dashboard access
-                if ((int)($user['is_verified'] ?? 0) !== 1) {
+                $needs_otp = (int)($user['is_verified'] ?? 0) !== 1 && ($user['status'] ?? '') === 'pending' && !empty($user['otp']);
+                if ($needs_otp) {
                     $_SESSION['pending_user_id'] = $user['id'];
                     if (!empty($_SESSION['selected_plan'])) {
                         $_SESSION['pending_plan'] = $_SESSION['selected_plan'];

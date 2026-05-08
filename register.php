@@ -60,16 +60,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($stmt->execute()) {
             $new_id = $conn->insert_id;
-            // Auto-login
+            // Registration complete, but DO NOT create authenticated session before OTP verification.
             session_regenerate_id(true);
-            $_SESSION['user_id']   = $new_id;
-            $_SESSION['username']  = $username;
-            $_SESSION['email']     = $email;
-            $_SESSION['site_id']   = '';
-            $_SESSION['role']      = 'client';
-            $_SESSION['status']    = 'pending';
-            $_SESSION['plan']      = null;
-            $_SESSION['logged_in'] = true;
+            unset(
+                $_SESSION['user_id'],
+                $_SESSION['username'],
+                $_SESSION['email'],
+                $_SESSION['site_id'],
+                $_SESSION['role'],
+                $_SESSION['status'],
+                $_SESSION['plan'],
+                $_SESSION['is_verified'],
+                $_SESSION['logged_in']
+            );
 
             // OTP generate karein
             $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -96,8 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             unset($_SESSION['selected_plan']);
             header('Location: verify_otp.php'); exit();
-            unset($_SESSION['selected_plan']); // clean up
-            header('Location: ' . $redirect); exit();
         } else {
             error_log("Registration failed: " . $stmt->error);
             $errors[] = "Registration failed. Please try again.";

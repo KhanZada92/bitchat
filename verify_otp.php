@@ -2,24 +2,40 @@
 require_once 'config/main_config.php';
 require_once 'email_notifications.php';
 
-if (!isset($_SESSION['pending_user_id'])) {
-    header('Location: register.php'); exit();
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
+if (!isset($_SESSION['pending_user_id']) && isset($_SESSION['user_id'])) {
+    $tmp_uid = (int)$_SESSION['user_id'];
+    $chk = $conn->prepare("SELECT is_verified, status, otp FROM users WHERE id=?");
+    $chk->bind_param("i", $tmp_uid);
+    $chk->execute();
+    $tmp_user = $chk->get_result()->fetch_assoc();
+    $chk->close();
+    $needs_otp = $tmp_user && (int)($tmp_user['is_verified'] ?? 0) !== 1 && ($tmp_user['status'] ?? '') === 'pending' && !empty($tmp_user['otp']);
+    if ($needs_otp) {
+        $_SESSION['pending_user_id'] = $tmp_uid;
+    }
 }
+if (!isset($_SESSION['pending_user_id'])) { header('Location: register.php'); exit(); }
 
 $user_id = $_SESSION['pending_user_id'];
 $selected_plan = $_SESSION['pending_plan'] ?? '';
 $errors = [];
 $success = '';
 
-$stmt = $conn->prepare("SELECT id, username, email, otp, otp_expires_at, is_verified FROM users WHERE id = ?");
+$stmt = $conn->prepare("SELECT id, username, email, otp, otp_expires_at, is_verified, status, plan FROM users WHERE id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$user) { header('Location: register.php'); exit(); }
-if ($user['is_verified']) {
-    $redirect = !empty($selected_plan) ? 'select_plan.php?plan=' . $selected_plan : 'select_plan.php';
+if ((int)$user['is_verified'] === 1) {
+    $redirect = (!empty($user['plan']) && $user['plan'] !== 'none')
+        ? 'dashboard.php'
+        : (!empty($selected_plan) ? 'select_plan.php?plan=' . $selected_plan : 'select_plan.php');
     header('Location: ' . $redirect); exit();
 }
 
@@ -52,6 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['role']      = 'client';
         $_SESSION['status']    = 'pending';
         $_SESSION['plan']      = null;
+        $_SESSION['is_verified'] = 1;
         $_SESSION['logged_in'] = true;
         unset($_SESSION['pending_user_id'], $_SESSION['pending_plan']);
 
