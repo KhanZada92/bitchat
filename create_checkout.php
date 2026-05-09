@@ -37,9 +37,9 @@ try {
     $plan = $body['plan'] ?? null;
 
     if (!$plan) {
+        http_response_code(400);
         echo json_encode([
-            'error' => 'Plan missing',
-            'raw' => $raw
+            'error' => 'Plan missing'
         ]);
         exit();
     }
@@ -89,6 +89,13 @@ try {
     // 5. SANDBOX MODE
     // ─────────────────────────────
     if (!$stripe_ready) {
+        if (!isSandboxPaymentsAllowed()) {
+            http_response_code(503);
+            echo json_encode([
+                'error' => 'Payment gateway is not configured. Please contact support.'
+            ]);
+            exit();
+        }
 
         $cfg = [
             'basic'   => ['upload_limit_mb' => 10,  'max_chatbots' => 1],
@@ -147,7 +154,9 @@ try {
     ]);
 
 } catch (Exception $e) {
+    error_log('create_checkout error: ' . $e->getMessage());
+    http_response_code(500);
     echo json_encode([
-        'error' => $e->getMessage()
+        'error' => 'Unable to create checkout session right now. Please try again.'
     ]);
 }

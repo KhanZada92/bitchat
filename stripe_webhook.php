@@ -52,8 +52,11 @@ $event = null;
 try {
     if (!empty($STRIPE_WEBHOOK_SECRET) && !empty($sig)) {
         $event = \Stripe\Webhook::constructEvent($payload, $sig, $STRIPE_WEBHOOK_SECRET);
-    } else {
+    } elseif (isSandboxPaymentsAllowed()) {
+        // Explicitly allowed for local/test environments only.
         $event = \Stripe\Event::constructFrom(json_decode($payload, true));
+    } else {
+        throw new Exception('Missing Stripe webhook signature or webhook secret.');
     }
 } catch (\Stripe\Exception\SignatureVerificationException $e) {
     http_response_code(400);

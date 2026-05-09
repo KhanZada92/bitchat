@@ -127,15 +127,15 @@ function alreadyActivated($conn, $session_ref) {
 // ════════════════════════════════════════════════
 // PATH A: SANDBOX / BYPASS
 // ════════════════════════════════════════════════
-$is_sandbox = (
+$is_sandbox = isSandboxPaymentsAllowed() && (
     $mode === 'sandbox' ||
     strpos($session_id, 'sandbox_') === 0 ||
-    strpos($session_id, 'bypass')   !== false
+    strpos($session_id, 'bypass') !== false
 );
 
 if ($is_sandbox) {
     try {
-        $uid = $_SESSION['user_id'] ?? (int)($_GET['user_id'] ?? 0) ?: null;
+        $uid = $_SESSION['user_id'] ?? null;
 
         if (!$uid) {
             throw new Exception('Not logged in. Please log in first, then retry payment.');

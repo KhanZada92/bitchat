@@ -64,7 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete_coupon' && isset($_POST['coupon_id'])) {
         $cid = intval($_POST['coupon_id']);
-        $conn->query("DELETE FROM coupons WHERE id=$cid");
+        $stmt = $conn->prepare("DELETE FROM coupons WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param("i", $cid);
+            $stmt->execute();
+            $stmt->close();
+        }
     }
 
     header('Location: admin.php?tab='.($_GET['tab']??'users')); exit();

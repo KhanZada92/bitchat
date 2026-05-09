@@ -1334,9 +1334,14 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
               throw new Error(data.error || ('Upload failed with status ' + res.status));
           }
           if (data.success) {
+              const warnHtml = Array.isArray(data.warnings) && data.warnings.length
+                  ? `<p style="font-size:12px;color:#FBBF24;margin-top:8px;">⚠ ${escHtml(data.warnings.join(' | '))}</p>`
+                  : '';
               result.innerHTML = `<div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--radius);padding:16px;">
                   <p style="font-weight:700;color:var(--green);font-size:13.5px;margin-bottom:4px;">Upload Successful ✅</p>
                   <p style="font-size:12.5px;color:rgba(52,211,153,0.7);">${data.qa_count} Q&As processed for <strong>${escHtml(ACTIVE_SITE_ID)}</strong></p>
+                  <p style="font-size:12px;color:rgba(165,180,252,0.9);margin-top:6px;">Stored in: <strong>${escHtml(data.storage || 'drive')}</strong></p>
+                  ${warnHtml}
                   <button onclick="location.reload()" class="btn btn-primary" style="margin-top:12px;font-size:12.5px;padding:8px 16px;">Refresh Dashboard</button>
               </div>`;
           } else {

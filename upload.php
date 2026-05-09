@@ -8,6 +8,12 @@ if (file_exists($vendorAutoload)) {
 
 header('Content-Type: application/json');
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+    exit();
+}
+
 if (!function_exists('curl_init')) {
     echo json_encode(['success' => false, 'error' => 'Server missing cURL extension.']); exit();
 }
@@ -588,7 +594,21 @@ if (empty($qa_pairs)) {
 // ── 8. Write temp JSON ────────────────────────────────
 $json_filename = $site_id . '.json';
 $json_tmp      = sys_get_temp_dir() . '/' . $json_filename;
-file_put_contents($json_tmp, json_encode($qa_pairs, JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT));
+$json_payload  = json_encode($qa_pairs, JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT);
+if (!is_string($json_payload) || $json_payload === '') {
+    echo json_encode(['success'=>false,'error'=>'Failed to generate JSON from extracted content']); exit();
+}
+if (@file_put_contents($json_tmp, $json_payload) === false) {
+    echo json_encode(['success'=>false,'error'=>'Failed to prepare upload JSON file']); exit();
+}
+
+// Keep a local copy as fallback so training data is never lost if Drive fails.
+$local_storage_dir = __DIR__ . '/storage/knowledge_json';
+if (!is_dir($local_storage_dir)) {
+    @mkdir($local_storage_dir, 0775, true);
+}
+$local_json_path = $local_storage_dir . '/' . $json_filename;
+$local_saved = @file_put_contents($local_json_path, $json_payload) !== false;
 
 // ── 9. Google Drive Auth ──────────────────────────────
 $sa = [
@@ -618,37 +638,52 @@ function get_drive_token(array $sa): string {
     return $res['access_token'] ?? '';
 }
 
+$warnings = [];
+$drive_id = '';
+$drive_enabled = true;
+
 $token = get_drive_token($sa);
-if (!$token) { echo json_encode(['success'=>false,'error'=>'Drive auth failed']); exit(); }
+if (!$token) {
+    $drive_enabled = false;
+    $warnings[] = 'Drive auth failed; saved locally instead.';
+}
 
 // ── 10. Upload to Shared Drive ────────────────────────
-$drive_folder_id = '0AB2nBzt58cUxUk9PVA';
-$file_content    = file_get_contents($json_tmp);
-$metadata        = json_encode(['name'=>$json_filename,'parents'=>[$drive_folder_id]]);
-$boundary        = '----WLP'.uniqid();
-$body_upload = "--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$metadata\r\n"
-      . "--$boundary\r\nContent-Type: application/json\r\n\r\n$file_content\r\n--$boundary--";
+if ($drive_enabled) {
+    $drive_folder_id = '0AB2nBzt58cUxUk9PVA';
+    $file_content    = file_get_contents($json_tmp);
+    $metadata        = json_encode(['name'=>$json_filename,'parents'=>[$drive_folder_id]]);
+    $boundary        = '----WLP'.uniqid();
+    $body_upload = "--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$metadata\r\n"
+          . "--$boundary\r\nContent-Type: application/json\r\n\r\n$file_content\r\n--$boundary--";
 
-$ch = curl_init('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink,name');
-curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>30,
-    CURLOPT_POSTFIELDS=>$body_upload,
-    CURLOPT_HTTPHEADER=>["Authorization: Bearer $token","Content-Type: multipart/related; boundary=$boundary","Content-Length: ".strlen($body_upload)]]);
-$raw       = curl_exec($ch);
-$curl_err  = curl_error($ch);
-$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
-@unlink($json_tmp);
+    $ch = curl_init('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink,name');
+    curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>30,
+        CURLOPT_POSTFIELDS=>$body_upload,
+        CURLOPT_HTTPHEADER=>["Authorization: Bearer $token","Content-Type: multipart/related; boundary=$boundary","Content-Length: ".strlen($body_upload)]]);
+    $raw       = curl_exec($ch);
+    $curl_err  = curl_error($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
-if ($curl_err || $http_code !== 200) {
-    $res = json_decode($raw, true);
-    echo json_encode(['success'=>false,'error'=>'Drive upload failed: '.($res['error']['message']??$curl_err)]); exit();
+    if ($curl_err || $http_code !== 200) {
+        $drive_enabled = false;
+        $res = json_decode((string)$raw, true);
+        $drive_msg = (string)($res['error']['message'] ?? $curl_err ?: ('HTTP ' . $http_code));
+        $warnings[] = 'Drive upload failed; saved locally instead. ' . $drive_msg;
+    } else {
+        $res = json_decode((string)$raw, true);
+        $drive_id = (string)($res['id'] ?? '');
+    }
 }
-$res = json_decode($raw, true);
+@unlink($json_tmp);
+if (!$local_saved && !$drive_enabled) {
+    echo json_encode(['success'=>false,'error'=>'Could not store extracted JSON (both Drive and local save failed).']); exit();
+}
 
 // ── 11. Save to DB ────────────────────────────────────
 $file_size_kb = round($file_size / 1024);
 $qa_count     = count($qa_pairs);
-$drive_id     = $res['id'] ?? '';
 $now_dt       = date('Y-m-d H:i:s');
 
 // Mark previous successful uploads for this site as replaced.
@@ -728,5 +763,7 @@ echo json_encode([
     'vectors_stored' => count($points),
     'drive_file_id'  => $drive_id,
     'filename'       => $json_filename,
+    'storage'        => $drive_enabled ? 'drive' : 'local',
+    'warnings'       => $warnings,
 ]);
 ?>

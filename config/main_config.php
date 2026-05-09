@@ -158,4 +158,16 @@ function getDBConnection() {
     return getPDOConnection();
 }
 
+/**
+ * Allow sandbox payment bypass only when explicitly enabled.
+ * Defaults to OFF for safety in production.
+ */
+function isSandboxPaymentsAllowed(): bool {
+    $raw = getenv('ALLOW_SANDBOX_PAYMENTS');
+    if ($raw === false) {
+        return false;
+    }
+    return in_array(strtolower(trim((string)$raw)), ['1', 'true', 'yes', 'on'], true);
+}
+
 ?>
