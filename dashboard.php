@@ -116,6 +116,8 @@ if (empty($user_sites) && !empty($_SESSION['site_id'])) {
 
 $has_any_site = !empty($user_sites);
 
+$password_msg = null;
+
 // ── Active site from URL param or first ──
 $active_site_id = $_GET['site'] ?? ($user_sites[0]['site_id'] ?? '');
 $active_site    = null;
@@ -142,6 +144,44 @@ if (!$is_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['apply_c
         $_SESSION['plan'] = $cpn_row['plan'];
         $_SESSION['upload_limit_mb'] = $cpn_row['upload_limit_mb'];
         $_SESSION['coupon_expires_at'] = $exp;
+    }
+}
+
+// POST: Change password
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
+    $current_password = (string)($_POST['current_password'] ?? '');
+    $new_password     = (string)($_POST['new_password'] ?? '');
+    $confirm_password = (string)($_POST['confirm_password'] ?? '');
+
+    if ($current_password === '' || $new_password === '' || $confirm_password === '') {
+        $password_msg = ['type' => 'error', 'text' => 'All password fields are required.'];
+    } elseif (strlen($new_password) < 6) {
+        $password_msg = ['type' => 'error', 'text' => 'New password must be at least 6 characters.'];
+    } elseif ($new_password !== $confirm_password) {
+        $password_msg = ['type' => 'error', 'text' => 'New password and confirm password do not match.'];
+    } elseif ($current_password === $new_password) {
+        $password_msg = ['type' => 'error', 'text' => 'New password must be different from current password.'];
+    } else {
+        $ps = $conn->prepare("SELECT password FROM users WHERE id=? LIMIT 1");
+        $ps->bind_param("i", $_SESSION['user_id']);
+        $ps->execute();
+        $rowp = $ps->get_result()->fetch_assoc();
+        $ps->close();
+
+        if (!$rowp || !password_verify($current_password, (string)$rowp['password'])) {
+            $password_msg = ['type' => 'error', 'text' => 'Current password is incorrect.'];
+        } else {
+            $new_hash = password_hash($new_password, PASSWORD_DEFAULT);
+            $up = $conn->prepare("UPDATE users SET password=? WHERE id=?");
+            $up->bind_param("si", $new_hash, $_SESSION['user_id']);
+            $ok = $up->execute();
+            $up->close();
+            if ($ok) {
+                $password_msg = ['type' => 'success', 'text' => 'Password updated successfully.'];
+            } else {
+                $password_msg = ['type' => 'error', 'text' => 'Could not update password. Please try again.'];
+            }
+        }
     }
 }
 
@@ -921,6 +961,27 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
       </div>
     </div>
 
+    <!-- Change Password -->
+    <div class="settings-card">
+      <div class="settings-card-header">
+        <p style="font-size:13.5px;font-weight:700;color:white;">Change Password</p>
+      </div>
+      <div class="settings-card-body">
+        <?php if($password_msg): ?>
+        <div style="margin-bottom:12px;padding:10px 12px;border-radius:10px;border:1px solid <?php echo $password_msg['type']==='success'?'rgba(16,185,129,0.3)':'rgba(239,68,68,0.25)'; ?>;background:<?php echo $password_msg['type']==='success'?'rgba(16,185,129,0.08)':'rgba(239,68,68,0.08)'; ?>;color:<?php echo $password_msg['type']==='success'?'#34D399':'#F87171'; ?>;font-size:12.5px;">
+          <?php echo htmlspecialchars($password_msg['text']); ?>
+        </div>
+        <?php endif; ?>
+        <form method="POST" style="display:flex;flex-direction:column;gap:10px;">
+          <input type="hidden" name="change_password" value="1">
+          <input type="password" name="current_password" class="inp" placeholder="Current password" autocomplete="current-password" required>
+          <input type="password" name="new_password" class="inp" placeholder="New password (min 6 chars)" autocomplete="new-password" required>
+          <input type="password" name="confirm_password" class="inp" placeholder="Confirm new password" autocomplete="new-password" required>
+          <button type="submit" class="btn btn-primary" style="margin-top:4px;">Update Password</button>
+        </form>
+      </div>
+    </div>
+
   </div>
 
   <!-- ══ SITE SETTINGS TAB ══ -->
@@ -1393,11 +1454,16 @@ function toggleSiteAcc(bodyId, header) {
   }
 
   async function deleteSite(site_id) {
-      if (!confirm('Delete this site? All its conversations and data will still exist but the site tab will be removed.')) return;
+      if (!confirm('Delete this site? This will remove site data, uploads, embed linkage, Drive JSON files, and Qdrant collection for this site.')) return;
       try {
           const res  = await fetch('manage_sites.php', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'delete', site_id}) });
           const data = await res.json();
-          if (data.success) { window.location.href = '?'; }
+          if (data.success) {
+              if (Array.isArray(data.warnings) && data.warnings.length) {
+                  alert('Site deleted, but some external cleanup returned warnings:\n- ' + data.warnings.join('\n- '));
+              }
+              window.location.href = '?';
+          }
           else { alert('Error: ' + (data.error||'Could not delete')); }
       } catch(e) { alert('Network error'); }
   }
