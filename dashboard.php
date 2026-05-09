@@ -528,7 +528,7 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
       Test Chatbot
     </button>
-<button onclick="toggleSupportWidget()" id="nav-support" class="nav-item" style="position:relative;">
+<button onclick="showSection('support')" id="nav-support" class="nav-item" style="position:relative;">
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
@@ -849,7 +849,7 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
                 <h1 class="section-title" style="font-size:16px;">Support Chat</h1>
                 <p class="section-sub" style="margin-top:2px;font-size:11.5px;">Manual team reply within 24 hours</p>
             </div>
-            <button onclick="closeSupportWidget()" type="button" style="border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:16px;line-height:1;">&times;</button>
+            <button onclick="showSection('overview')" type="button" style="border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:16px;line-height:1;">&times;</button>
         </div>
  
         <!-- Chat window -->
@@ -1228,7 +1228,7 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
               name = 'upload';
           }
       }
-      ['overview','upload','conversations','test','embed','settings'].forEach(s => {
+      ['overview','upload','conversations','test','embed','support','settings'].forEach(s => {
           const sec = document.getElementById(s + '-section');
           const btn = document.getElementById('nav-' + s);
           if (sec) sec.style.display = 'none';
@@ -1238,6 +1238,11 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
       const b = document.getElementById('nav-' + name);
       if (t) t.style.display = '';
       if (b) b.classList.add('active');
+      if (name === 'support') {
+          openSupportWidget();
+      } else {
+          closeSupportWidget();
+      }
       if (window.innerWidth < 1024) {
           document.getElementById('sidebar').style.transform = 'translateX(-100%)';
           document.getElementById('overlay').style.display = 'none';
@@ -1318,7 +1323,7 @@ $pc = $plan_cfg[$plan] ?? $plan_cfg['basic'];
       fd.append('qa_file', selectedFile);
       fd.append('site_ref', ACTIVE_SITE_ID);
       try {
-          const res  = await fetch('upload.php', { method: 'POST', body: fd });
+          const res  = await fetch('api/upload-knowledge.php', { method: 'POST', body: fd });
           const raw  = await res.text();
           let data;
           try {
@@ -1491,7 +1496,7 @@ function openSupportWidget() {
 function closeSupportWidget() {
     supportWidgetOpen = false;
     document.getElementById('support-section').style.display = 'none';
-    document.getElementById('sup-fab').style.display = 'flex';
+    document.getElementById('sup-fab').style.display = 'none';
     clearInterval(supPoll);
 }
 
