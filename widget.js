@@ -10,7 +10,7 @@
     return;
   }
 
-  const WEBHOOK_URL  = 'https://n8n.bitchatbot.io/webhook/chat';
+  const WEBHOOK_URL  = 'https://n8n.turbotoolz.online/webhook/chat';
   const SETTINGS_URL = 'https://bitchatbot.io/get_chatbot_settings.php?site=';
   const SESSION_KEY  = 'bitchat_session_' + SITE_ID;
 
