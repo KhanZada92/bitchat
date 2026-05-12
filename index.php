@@ -473,8 +473,6 @@ body::before {
       <a href="#how-it-works">How It Works</a>
       <a href="#pricing">Pricing</a>
       <a href="about.php">About</a>
-      <a href="privacy.php">Privacy</a>
-      <a href="terms.php">Terms</a>
     </div>
 
     <!-- Right: Auth buttons -->
@@ -498,8 +496,6 @@ body::before {
     <a href="#how-it-works" onclick="closeMNav()">How It Works</a>
     <a href="#pricing" onclick="closeMNav()">Pricing</a>
     <a href="about.php" onclick="closeMNav()">About</a>
-    <a href="privacy.php" onclick="closeMNav()">Privacy</a>
-    <a href="terms.php" onclick="closeMNav()">Terms</a> 
   </div>
 </div>
 
