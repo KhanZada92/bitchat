@@ -151,8 +151,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       <a href="index.php#how-it-works">How It Works</a>
       <a href="index.php#pricing">Pricing</a>
       <a href="about.php" class="active">About</a>
-      <a href="index.php#faq">FAQ</a>
-      <a href="privacy.php">Privacy</a>
     </div>
     <div class="nav-actions">
       <?php if (isset($_SESSION['user_id'])): ?>
@@ -329,7 +327,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 <footer class="site-footer">
   <div class="footer-bottom">
     <p class="footer-copy">&copy; 2026 Bitchatbot.io — All rights reserved.</p>
-    <p class="footer-copy"><a href="index.php">Home</a><a href="about.php">About Us</a><a href="privacy.php">Privacy Policy</a></p>
+    <p class="footer-copy"><a href="privacy.php">Privacy Policy</a><a href="terms.php">Terms &amp; Conditions</a></p>
   </div>
 </footer>
 </body>

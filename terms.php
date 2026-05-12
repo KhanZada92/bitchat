@@ -315,8 +315,6 @@ body::before {
       <a href="/#how-it-works">How It Works</a>
       <a href="/#pricing">Pricing</a>
       <a href="about.php">About</a>
-      <a href="privacy.php">Privacy</a>
-      <a href="terms.php" class="active">Terms</a>
     </div>
     <div class="nav-actions">
       <?php if (isset($_SESSION['user_id'])): ?>
@@ -337,8 +335,6 @@ body::before {
     <a href="/#how-it-works" onclick="closeMNav()">How It Works</a>
     <a href="/#pricing" onclick="closeMNav()">Pricing</a>
     <a href="about.php" onclick="closeMNav()">About</a>
-    <a href="privacy.php" onclick="closeMNav()">Privacy</a>
-    <a href="terms.php" onclick="closeMNav()">Terms</a>
   </div>
 </div>
 
@@ -634,21 +630,10 @@ body::before {
       <p class="footer-brand-desc">AI chatbot platform for businesses. Train on your own data, embed on your website, and answer customer questions automatically — 24/7.</p>
     </div>
     <div>
-      <p class="footer-col-title">Product</p>
+      <p class="footer-col-title">Legal</p>
       <ul class="footer-links">
-        <li><a href="/#features">Features</a></li>
-        <li><a href="/#how-it-works">How It Works</a></li>
-        <li><a href="/#pricing">Pricing</a></li>
-      </ul>
-    </div>
-    <div>
-      <p class="footer-col-title">Company</p>
-      <ul class="footer-links">
-        <li><a href="about.php">About Us</a></li>
         <li><a href="privacy.php">Privacy Policy</a></li>
         <li><a href="terms.php" class="active">Terms &amp; Conditions</a></li>
-        <li><a href="login.php">Login</a></li>
-        <li><a href="register.php">Register</a></li>
       </ul>
     </div>
   </div>
