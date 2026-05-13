@@ -1,0 +1,209 @@
+Q1: Bitchatbot kya hai?
+A1: Bitchatbot ek AI chatbot platform hai jahan aap apna data upload karke website par chatbot embed kar sakte hain. Bot aapke uploaded knowledge base se answers deta hai.
+
+Q2: Is platform ka simple workflow kya hai?
+A2: Flow yeh hai: Plan buy karo, dashboard kholo, site add karo, data upload/train karo, embed code copy karo, website mein paste karo, phir bot live ho jata hai.
+
+Q3: Plans kaun kaun se hain?
+A3: 3 plans hain: Basic, Starter, Pro.
+
+Q4: Basic plan ki price aur features kya hain?
+A4: Basic plan $10/month hai. Isme 1 AI chatbot agent, 1 website embed, FAQ/PDF/DOCX upload, aur conversation history milti hai. Custom branding aur priority support included nahi hoti.
+
+Q5: Starter plan ki price aur features kya hain?
+A5: Starter plan $20/month hai. Isme 5 AI chatbot agents, 5 websites embed, FAQ/PDF/DOCX upload, full conversation history, custom branding, aur priority support hota hai.
+
+Q6: Pro plan ki price aur features kya hain?
+A6: Pro plan $30/month hai. Isme 10 AI chatbot agents, 10 websites embed, FAQ/PDF/DOCX upload, full conversation history, full custom branding, aur dedicated support hota hai.
+
+Q7: Coupon se free plan mil sakta hai?
+A7: Haan, coupon apply karke Basic plan free ho sakta hai (coupon validity ke hisab se).
+
+Q8: Plan kaise buy karna hai?
+A8: Pricing/Select Plan page par jao, desired plan ka "Get Plan" button click karo, checkout complete karo. Successful payment ke baad plan account par activate ho jata hai.
+
+Q9: Payment cancel ho jaye to kya hoga?
+A9: Cancel hone par koi charge nahi hota. Aap dobara plan select karke checkout kar sakte ho.
+
+Q10: Plan activate hone ke baad kya hota hai?
+A10: Payment success ke baad aapka plan, upload limit, chatbot/site limits update ho jati hain aur aap dashboard par redirect ho jate ho.
+
+Q11: Plan duration kitni hoti hai?
+A11: Plan cycle monthly hai, system plan dates track karta hai aur expiry par renew ka option deta hai.
+
+Q12: Plan expire hone par chatbot band ho jata hai?
+A12: Expiry par chatbot request block/limited ho sakti hai aur renew prompt aata hai. Renew karte hi normal usage resume ho jata hai.
+
+Q13: Dashboard me pehla step kya hota hai?
+A13: Sabse pehle "Add Site" karo. Site create hone ke baad us site ka data upload karo, phir embed code generate/copy karo.
+
+Q14: Dashboard ke main sections kaun se hain?
+A14: Overview, Upload Data, Conversations, Embed Code, Test Chatbot, Support Chat, aur Settings.
+
+Q15: Overview section ka use kya hai?
+A15: Overview me quick onboarding steps, active site info, aur next recommended actions milte hain.
+
+Q16: Add Site kaise karte hain?
+A16: Sidebar ya settings se "Add Site" click karo, site name aur optional website URL/domain do, save karo. Site create hote hi aap us par switch kar sakte ho.
+
+Q17: Site add karte waqt website URL dena zaroori hai?
+A17: Nahi, optional hai. Lekin dene se domain restriction enforce ki ja sakti hai taake widget sirf allowed domain par chale.
+
+Q18: Kitni sites add kar sakte hain?
+A18: Basic me 1 site, Starter me 5 sites, Pro me 10 sites. Admin mode me higher/unlimited allowance ho sakti hai.
+
+Q19: New site add karne ke baad next step kya hai?
+A19: New site select karo, Upload Data section me jao, knowledge file upload/train karo, phir Embed Code copy karke website me lagao.
+
+Q20: Site switch kaise karte hain?
+A20: Sidebar me "My Sites" list se desired site select karo. Dashboard ka data aur settings us active site ke hisab se update ho jata hai.
+
+Q21: Site edit kaise karni hai?
+A21: Settings ke Site Settings me ja kar site name aur website URL update karo. Save karte hi changes apply ho jate hain.
+
+Q22: Site delete kaise karni hai?
+A22: Settings/Site card me "Delete Site" option use karo. Confirmation ke baad selected site ka linked data remove ho jata hai.
+
+Q23: Site delete karne par kya-kya remove hota hai?
+A23: Site delete par us site ka chatbot settings, chat history, uploads references, aur related vector collection/linkage remove ho sakti hai.
+
+Q24: Kya last/only site delete kar sakte hain?
+A24: Nahi, agar sirf ek site bachi ho to system usually delete allow nahi karta. Pehle ek aur site add karo.
+
+Q25: Upload Data section ka purpose kya hai?
+A25: Is section me aap chatbot ki training knowledge upload karte ho, jis se bot user questions ka accurate answer de sakta hai.
+
+Q26: Kaun se file formats support hote hain?
+A26: DOCX, PDF, aur JSON supported hain.
+
+Q27: Upload file size limit kya hoti hai?
+A27: Limit plan-based hoti hai. Account me configured upload MB limit follow hoti hai.
+
+Q28: Plan wise upload limit kitni hai?
+A28: Common config ke mutabiq Basic 10 MB per site, Starter 50 MB per site, aur Pro 200 MB per site tak allowed hai.
+
+Q29: Upload fail ho to common reasons kya hain?
+A29: Unsupported format, file size limit exceed, corrupt/unreadable document, ya wrong/no active site selected.
+
+Q30: Upload ke baad training kaise hoti hai?
+A30: System uploaded content ko Q/A style knowledge me process karke storage/vector layer me push karta hai, phir chatbot us data ko response ke liye use karta hai.
+
+Q31: Kya har site ka data alag hota hai?
+A31: Haan, bilkul. Har site ka knowledge base, chats, aur settings independent hoti hain.
+
+Q32: Purana upload replace hota hai ya merge?
+A32: New upload ke baad previous successful upload entries "replaced" mark ho sakti hain; active knowledge latest upload se update hoti hai.
+
+Q33: Conversations section me kya milta hai?
+A33: Sessions aur message history milti hai jisse aap dekh sakte ho users kya pooch rahe hain aur bot kya reply kar raha hai.
+
+Q34: Conversations se business ko kya faida hai?
+A34: Repeated questions identify hote hain, content gaps milte hain, aur aap knowledge base improve karke bot accuracy better kar sakte ho.
+
+Q35: Embed code kahan se milega?
+A35: Dashboard ke Embed Code section me active site ka unique script milta hai.
+
+Q36: Embed code website me kahan paste karna hai?
+A36: Website ke HTML me closing body tag se pehle paste karo, yani </body> se just pehle.
+
+Q37: Kya har site ka embed code alag hota hai?
+A37: Haan. Har site ke liye unique data-site-id hota hai, isi liye code per-site different hota hai.
+
+Q38: Embed ke baad chatbot show nahi ho raha, kya check karein?
+A38: 1) Sahi site ka code lagaya? 2) Domain restriction mismatch to nahi? 3) Plan active hai? 4) Browser cache clear/refresh karo.
+
+Q39: Domain restriction ka matlab kya hai?
+A39: Agar site URL/domain set hai to widget allowed domain par hi load hota hai. Doosre domain par chatbot intentionally hide/disable ho sakta hai.
+
+Q40: Test Chatbot section ka use kya hai?
+A40: Live website par deploy se pehle active site ke chatbot ko test karne ke liye built-in preview/chat frame milta hai.
+
+Q41: Agar Test section me bot disabled aaye to kya karein?
+A41: Pehle us active site ke liye data upload/train karo. Data ke bina chatbot meaningful answers nahi dega.
+
+Q42: Custom branding kahan se hoti hai?
+A42: Chatbot Customize page me per-site basis par chatbot name, greeting message, aur primary color set kar sakte ho.
+
+Q43: Custom branding sab plans me available hai?
+A43: Basic me limited/no custom branding hoti hai. Starter aur Pro me customization unlocked hoti hai.
+
+Q44: Chatbot name change karne se kya effect hota hai?
+A44: Name widget toggle aur chat header me display hota hai, jis se bot branding aapke business ke mutabiq lagti hai.
+
+Q45: Greeting message kya hota hai?
+A45: Greeting wo first message hai jo chatbot open hote hi visitor ko show hota hai.
+
+Q46: Primary color change karne se kya change hota hai?
+A46: Toggle button, header bar, user message bubbles, aur send button ka theme color update ho jata hai.
+
+Q47: Kya har site ka alag chatbot name/color ho sakta hai?
+A47: Haan, settings site-specific hain. Site A aur Site B ki branding bilkul alag rakh sakte ho.
+
+Q48: Settings section me kya manage hota hai?
+A48: Account info, current plan, plan status, limits, aur per-site configuration management.
+
+Q49: Plan upgrade kaise karein?
+A49: Settings ya plan page se "Manage Plan/Upgrade" par jao, naya plan select karo, checkout complete karo.
+
+Q50: Plan renew kaise karein?
+A50: Expiry warning ya renew link se select_plan page par jao, desired plan buy/renew karo.
+
+Q51: Buy ke baad dashboard setup ka best order kya hona chahiye?
+A51: Best order: Add Site -> Upload Data -> Test Chatbot -> Customize Branding -> Embed Code copy -> Website me paste -> Conversations monitor.
+
+Q52: Multi-client ya agency use case ke liye kaunsa plan best hai?
+A52: Pro plan best hai kyunki isme zyada chatbot agents/sites allowance aur dedicated support milta hai.
+
+Q53: Support kaise milti hai?
+A53: Dashboard me support chat section available hai jahan team manual response deti hai (typical response window 24 hours).
+
+Q54: Kya chatbot automatically website questions samajh leta hai?
+A54: Bot primarily uploaded knowledge base par depend karta hai. Better accuracy ke liye relevant FAQs/docs regularly update karte rahen.
+
+Q55: Knowledge update karni ho to kya karna hai?
+A55: Active site select karo, updated DOCX/PDF/JSON dubara upload karo, phir test karke verify karo responses improved hain.
+
+Q56: Kya same account me multiple business sites manage kar sakte hain?
+A56: Haan, plan limit ke andar multiple sites add karke un sab ka data, chats, aur branding separately manage kar sakte ho.
+
+Q57: Basic se Starter/Pro me move karne ka main faida kya hai?
+A57: Zyada sites/agents, higher upload limits, advanced branding, aur better support options.
+
+Q58: Agar user bole "mera chatbot answer galat de raha hai" to kya guide karna chahiye?
+A58: Unko bolo relevant aur updated Q/A docs upload karein, unclear docs clean karein, phir test chatbot me check karein. Needed ho to greeting/branding alag hai, answer quality knowledge file par depend karti hai.
+
+Q59: Agar user bole "new site ke liye zero se setup batao" to kya answer dena hai?
+A59: Dashboard kholo -> Add Site -> Site select karo -> Upload Data karo -> Test Chatbot -> Customize (optional) -> Embed Code copy karo -> Website ke </body> se pehle paste karo -> Live verify karo.
+
+Q60: Agar user bole "site remove karni hai" to kya warning deni chahiye?
+A60: Delete site irreversible ho sakta hai aur us site ka uploads/chat history/settings remove ho jati hain. Delete se pehle backup/export karna recommended hai.
+
+Q61: Agar widget open ho raha ho lekin replies na aa rahe hon to kya karein?
+A61: Plan status check karo, active site par data upload check karo, site_id mismatch check karo, aur test section me same site par validation karo.
+
+Q62: Agar user pooche "kya bina developer ke setup ho jayega?" to kya jawab ho?
+A62: Haan, basic setup non-technical users bhi kar sakte hain. Sirf dashboard steps follow karne hain aur embed script website me paste karni hoti hai.
+
+Q63: Kya platform WordPress/Webflow/custom HTML par kaam karta hai?
+A63: Haan, jahan custom script insert kar sakte ho wahan generally widget integrate ho jata hai.
+
+Q64: Agar plan nahi hai to chatbot ka behavior kya hota hai?
+A64: No-plan state me chatbot activation restricted hoti hai aur user ko plan purchase page par guide kiya jata hai.
+
+Q65: Agar account banned ho to chatbot chalega?
+A65: Nahi, banned status me chatbot usage restricted hota hai jab tak account status restore na ho.
+
+Q66: Kya dashboard me site-wise data visibility hoti hai?
+A66: Haan, uploads, conversation stats, embed code, aur settings active site ke hisab se show hote hain.
+
+Q67: Kya embedded bot ka naam aur color live update ho jata hai?
+A67: Haan, settings API se fetch hoti hain. Update save ke baad widget refresh par new branding apply ho jati hai.
+
+Q68: Agar user bole "mujhe complete onboarding do", short version kya hogi?
+A68: 1) Plan buy 2) Site add 3) Data upload 4) Bot test 5) Branding set 6) Embed code copy 7) Website me paste 8) Chats monitor aur knowledge update.
+
+Q69: Kya chatbot per-site independent hota hai?
+A69: Haan. Har site ka separate site_id hota hai aur uska chatbot data, theme, aur chats alag rehte hain.
+
+Q70: Agar user bole "mujhe sab kuch ek jagah samjhao" to final one-line answer kya ho?
+A70: Bitchatbot me aap plan buy karke multiple sites ke liye alag AI chatbots bana sakte ho, unhe apne docs se train kar sakte ho, brand customize kar sakte ho, website me embed kar sakte ho, aur dashboard se sari conversations aur settings manage kar sakte ho.

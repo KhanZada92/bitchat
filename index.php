@@ -1,4 +1,14 @@
-<?php require_once 'config/main_config.php'; ?>
+<?php
+require_once 'config/main_config.php';
+
+if (
+    isset($_SESSION['user_id'], $_SESSION['logged_in'])
+    && $_SESSION['logged_in'] === true
+) {
+    header('Location: dashboard.php');
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
